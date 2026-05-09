@@ -11,7 +11,7 @@
       flake = false;
       url = "github:raspberrypi/linux/rpi-6.6.y";
     };
-    rpi-linux-6_12_17-src = {
+    rpi-linux-6_12_87-src = {
       flake = false;
       url = "github:raspberrypi/linux/rpi-6.12.y";
     };
