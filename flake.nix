@@ -96,6 +96,14 @@
               networking.hostName = "rpi5-installer";
               networking.useDHCP = true;
               services.openssh.enable = true;
+
+              # Force HDMI output even if no hotplug detected
+              hardware.raspberry-pi.config.all.options = {
+                hdmi_force_hotplug = {
+                  enable = true;
+                  value = 1;
+                };
+              };
               nvme-installer = {
                 enable = true;
                 targetSystem = self.nixosConfigurations.nvme-target;
