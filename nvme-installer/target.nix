@@ -29,6 +29,16 @@ in
       "uas"
     ];
 
+    # Ensure USB modules stay loaded after boot
+    boot.kernelModules = [
+      "xhci_hcd"
+      "xhci_pci"
+      "usbhid"
+    ];
+
+    # Don't reboot on kernel panic (helps debug)
+    boot.kernel.sysctl."kernel.panic" = 0;
+
     boot.kernelParams = lib.mkAfter [
       "root=LABEL=NIXOS_NVME"
       "rootfstype=ext4"
