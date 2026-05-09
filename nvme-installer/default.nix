@@ -178,7 +178,7 @@ in
     services.getty.autologinUser = "root";
 
     # Show install instructions on login
-    environment.etc."motd".text = ''
+    users.motd = ''
 
       ==========================================
        NixOS NVMe Installer for Raspberry Pi 5
