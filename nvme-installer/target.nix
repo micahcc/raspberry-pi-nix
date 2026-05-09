@@ -19,10 +19,12 @@ in
     raspberry-pi-nix.board = lib.mkDefault "bcm2712";
     raspberry-pi-nix.kernel-version = lib.mkDefault "v6_12_87";
 
-    # NVMe-specific kernel modules
     boot.initrd.availableKernelModules = [
       "nvme"
       "pcie_brcmstb"
+      "xhci_hcd"
+      "xhci_pci"
+      "usbhid"
     ];
 
     boot.kernelParams = lib.mkAfter [
