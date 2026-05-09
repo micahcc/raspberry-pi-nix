@@ -16,8 +16,8 @@ let
 in
 {
   config = {
-    raspberry-pi-nix.board = "bcm2712";
-    raspberry-pi-nix.kernel-version = "v6_12_87";
+    raspberry-pi-nix.board = lib.mkDefault "bcm2712";
+    raspberry-pi-nix.kernel-version = lib.mkDefault "v6_12_87";
 
     # NVMe-specific kernel modules
     boot.initrd.availableKernelModules = [
