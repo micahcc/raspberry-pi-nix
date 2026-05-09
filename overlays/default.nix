@@ -1,6 +1,7 @@
 { rpi-linux-stable-src
 , rpi-linux-6_6_78-src
 , rpi-linux-6_12_87-src
+, rpi-linux-6_18_28-src
 , rpi-firmware-src
 , rpi-firmware-nonfree-src
 , rpi-bluez-firmware-src
@@ -12,6 +13,7 @@ let
     v6_6_51.src = rpi-linux-stable-src;
     v6_6_78.src = rpi-linux-6_6_78-src;
     v6_12_87.src = rpi-linux-6_12_87-src;
+    v6_18_28.src = rpi-linux-6_18_28-src;
   };
   boards = [ "bcm2711" "bcm2712" ];
 
