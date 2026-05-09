@@ -119,6 +119,18 @@
           ];
         };
       };
+      # Example: building nvmeInstallerSdImage independently from sdImage.
+      # Using explicit attributes avoids forcing evaluation of sdImage when
+      # only nvmeInstallerSdImage is requested.
+      #
+      #   nix build .#raspberrypis.rpi5.nvmeInstallerSdImage
+      #   nix build .#raspberrypis.rpi5.sdImage
+      #
+      raspberrypis.rpi5 = {
+        sdImage = self.nixosConfigurations.rpi-example.config.system.build.sdImage;
+        nvmeInstallerSdImage = self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
+      };
+
       checks.aarch64-linux = self.packages.aarch64-linux;
       packages.aarch64-linux = with pinned.lib;
         let
