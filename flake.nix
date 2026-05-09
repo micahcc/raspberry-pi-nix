@@ -97,9 +97,17 @@
               networking.useDHCP = true;
               services.openssh.enable = true;
 
-              # Force HDMI output even if no hotplug detected
               hardware.raspberry-pi.config.all.options = {
+                # Without this, HDMI output may not activate if the
+                # display isn't detected during early firmware init.
                 hdmi_force_hotplug = {
+                  enable = true;
+                  value = 1;
+                };
+                # Without this, the Pi refuses to boot from USB claiming
+                # insufficient power, even with a capable PSU that doesn't
+                # negotiate via USB-PD.
+                usb_max_current_enable = {
                   enable = true;
                   value = 1;
                 };
