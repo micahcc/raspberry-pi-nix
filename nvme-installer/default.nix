@@ -44,11 +44,9 @@ let
 
     echo ""
     echo ">>> Unmounting any existing partitions on $NVME_DEV..."
-    for part in $(lsblk -npo NAME "$NVME_DEV" | tail -n +2); do
-      if findmnt -n "$part" > /dev/null 2>&1; then
-        echo "    Unmounting $part"
-        umount "$part" || umount -l "$part"
-      fi
+    findmnt -rno SOURCE,TARGET | grep "^''${NVME_DEV}" | while read -r src mnt; do
+      echo "    Unmounting $src ($mnt)"
+      umount "$mnt" || umount -l "$mnt"
     done
 
     echo ">>> Partitioning $NVME_DEV..."
