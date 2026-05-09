@@ -60,11 +60,44 @@
           libcamera-overlay = self.overlays.libcamera;
         };
         sd-image = import ./sd-image;
+        nvme-installer = import ./nvme-installer;
+        nvme-target = import ./nvme-installer/target.nix;
       };
       nixosConfigurations = {
         rpi-example = srcs.nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
           modules = [ self.nixosModules.raspberry-pi self.nixosModules.sd-image ./example ];
+        };
+
+        # The NVMe target system (what gets installed on the NVMe)
+        nvme-target = srcs.nixpkgs.lib.nixosSystem {
+          system = "aarch64-linux";
+          modules = [
+            self.nixosModules.raspberry-pi
+            self.nixosModules.nvme-target
+            ./nvme-installer/example.nix
+          ];
+        };
+
+        # The SD card installer image (boots from SD, installs to NVMe)
+        nvme-installer = srcs.nixpkgs.lib.nixosSystem {
+          system = "aarch64-linux";
+          modules = [
+            self.nixosModules.raspberry-pi
+            self.nixosModules.sd-image
+            self.nixosModules.nvme-installer
+            {
+              raspberry-pi-nix.board = "bcm2712";
+              users.users.root.initialPassword = "nixos";
+              networking.hostName = "rpi5-installer";
+              networking.useDHCP = true;
+              services.openssh.enable = true;
+              nvme-installer = {
+                enable = true;
+                targetSystem = self.nixosConfigurations.nvme-target;
+              };
+            }
+          ];
         };
       };
       checks.aarch64-linux = self.packages.aarch64-linux;
@@ -82,6 +115,7 @@
         in
         {
           example-sd-image = self.nixosConfigurations.rpi-example.config.system.build.sdImage;
+          nvme-installer-sd-image = self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
           firmware = pinned.raspberrypifw;
           libcamera = pinned.libcamera;
           wireless-firmware = pinned.raspberrypiWirelessFirmware;

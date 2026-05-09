@@ -1,0 +1,155 @@
+# NVMe installer module for the SD card image.
+# This module configures the SD card system to include an install script
+# that partitions and installs NixOS onto an NVMe drive.
+{ config, lib, pkgs, ... }:
+
+let
+  # The target NixOS system closure that will be installed to NVMe
+  targetToplevel = config.nvme-installer.targetSystem.config.system.build.toplevel;
+  targetFirmware = config.nvme-installer.targetSystem.config.system.build.nvmeFirmware;
+
+  install-script = pkgs.writeShellScriptBin "install-nvme" ''
+    set -euo pipefail
+
+    NVME_DEV="''${1:-/dev/nvme0n1}"
+    TARGET_TOPLEVEL="${targetToplevel}"
+    TARGET_FIRMWARE="${targetFirmware}"
+
+    if [ "$(id -u)" -ne 0 ]; then
+      echo "Error: must run as root"
+      exit 1
+    fi
+
+    if [ ! -b "$NVME_DEV" ]; then
+      echo "Error: $NVME_DEV not found. Is an NVMe drive connected?"
+      echo "Available block devices:"
+      lsblk
+      exit 1
+    fi
+
+    echo "=========================================="
+    echo "NixOS NVMe Installer for Raspberry Pi 5"
+    echo "=========================================="
+    echo ""
+    echo "Target device: $NVME_DEV"
+    echo "NixOS closure: $TARGET_TOPLEVEL"
+    echo ""
+    echo "WARNING: This will ERASE ALL DATA on $NVME_DEV"
+    echo ""
+    read -p "Continue? [y/N] " confirm
+    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+      echo "Aborted."
+      exit 0
+    fi
+
+    echo ""
+    echo ">>> Partitioning $NVME_DEV..."
+    ${pkgs.util-linux}/bin/sfdisk "$NVME_DEV" <<EOF
+    label: dos
+
+    size=512M, type=b
+    type=83
+    EOF
+
+    sleep 1
+    ${pkgs.parted}/bin/partprobe "$NVME_DEV"
+    sleep 1
+
+    FIRMWARE_PART="''${NVME_DEV}p1"
+    ROOT_PART="''${NVME_DEV}p2"
+
+    echo ">>> Formatting firmware partition ($FIRMWARE_PART) as FAT32..."
+    ${pkgs.dosfstools}/bin/mkfs.vfat -F 32 -n FIRMWARE "$FIRMWARE_PART"
+
+    echo ">>> Formatting root partition ($ROOT_PART) as ext4..."
+    ${pkgs.e2fsprogs}/bin/mkfs.ext4 -F -L NIXOS_NVME "$ROOT_PART"
+
+    echo ">>> Mounting partitions..."
+    MOUNT_ROOT=$(mktemp -d)
+    mount "$ROOT_PART" "$MOUNT_ROOT"
+    mkdir -p "$MOUNT_ROOT/boot/firmware"
+    mount "$FIRMWARE_PART" "$MOUNT_ROOT/boot/firmware"
+
+    cleanup() {
+      echo ">>> Cleaning up mounts..."
+      umount "$MOUNT_ROOT/boot/firmware" 2>/dev/null || true
+      umount "$MOUNT_ROOT" 2>/dev/null || true
+      rmdir "$MOUNT_ROOT" 2>/dev/null || true
+    }
+    trap cleanup EXIT
+
+    echo ">>> Copying NixOS closure to NVMe (this may take a while)..."
+    mkdir -p "$MOUNT_ROOT/nix/store"
+
+    # Copy all store paths needed by the target system
+    ${pkgs.nix}/bin/nix copy --no-check-sigs --to "local?root=$MOUNT_ROOT" "$TARGET_TOPLEVEL"
+
+    echo ">>> Setting up system profile..."
+    mkdir -p "$MOUNT_ROOT/nix/var/nix/profiles"
+    ${pkgs.nix}/bin/nix-env --store "local?root=$MOUNT_ROOT" \
+      --profile "$MOUNT_ROOT/nix/var/nix/profiles/system" \
+      --set "$TARGET_TOPLEVEL"
+
+    echo ">>> Installing /sbin/init..."
+    mkdir -p "$MOUNT_ROOT/sbin"
+    cat > "$MOUNT_ROOT/sbin/init" <<INITEOF
+    #!${pkgs.bash}/bin/bash
+    exec $TARGET_TOPLEVEL/init
+    INITEOF
+    chmod 755 "$MOUNT_ROOT/sbin/init"
+
+    echo ">>> Creating /etc/NIXOS marker..."
+    mkdir -p "$MOUNT_ROOT/etc"
+    touch "$MOUNT_ROOT/etc/NIXOS"
+
+    echo ">>> Populating firmware partition..."
+    cp -r "$TARGET_FIRMWARE"/* "$MOUNT_ROOT/boot/firmware/"
+
+    echo ">>> Syncing..."
+    sync
+
+    echo ""
+    echo "=========================================="
+    echo "Installation complete!"
+    echo "=========================================="
+    echo ""
+    echo "Next steps:"
+    echo "  1. Power off the Raspberry Pi"
+    echo "  2. Remove the SD card"
+    echo "  3. The Pi should boot from NVMe"
+    echo ""
+    echo "If the Pi doesn't boot from NVMe, you may need to update"
+    echo "the EEPROM boot order to prioritize NVMe:"
+    echo "  sudo EDITOR=nano rpi-eeprom-config --edit"
+    echo "  Set BOOT_ORDER=0xf416 (NVMe first, then SD, then USB)"
+    echo ""
+  '';
+in
+{
+  options.nvme-installer = {
+    enable = lib.mkEnableOption "NVMe installer on the SD card image";
+
+    targetSystem = lib.mkOption {
+      type = lib.types.unspecified;
+      description = ''
+        The evaluated NixOS system configuration to install onto the NVMe.
+        This should be the result of `nixpkgs.lib.nixosSystem { ... }`.
+      '';
+    };
+  };
+
+  config = lib.mkIf config.nvme-installer.enable {
+    environment.systemPackages = [
+      install-script
+      pkgs.parted
+      pkgs.dosfstools
+      pkgs.e2fsprogs
+      pkgs.util-linux
+      pkgs.raspberrypi-eeprom
+      pkgs.nix
+    ];
+
+    # Ensure NVMe is available in the installer
+    boot.initrd.availableKernelModules = [ "nvme" ];
+  };
+}
