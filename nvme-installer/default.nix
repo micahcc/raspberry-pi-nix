@@ -43,6 +43,14 @@ let
     fi
 
     echo ""
+    echo ">>> Unmounting any existing partitions on $NVME_DEV..."
+    for part in $(lsblk -npo NAME "$NVME_DEV" | tail -n +2); do
+      if findmnt -n "$part" > /dev/null 2>&1; then
+        echo "    Unmounting $part"
+        umount "$part" || umount -l "$part"
+      fi
+    done
+
     echo ">>> Partitioning $NVME_DEV..."
     ${pkgs.util-linux}/bin/sfdisk "$NVME_DEV" <<EOF
     label: dos
@@ -108,22 +116,19 @@ let
     echo ">>> Syncing..."
     sync
 
-    echo ">>> Configuring EEPROM boot order for NVMe..."
-    # Set BOOT_ORDER=0xf416 (NVMe first, then SD, then USB, then restart)
-    # Set PCIE_PROBE=1 for non-HAT+ adapters
+    echo ">>> Configuring EEPROM for NVMe PCIe probe..."
+    # Set PCIE_PROBE=1 for non-HAT+ NVMe adapters
+    # Keep default boot order (SD, USB, NVMe)
     EEPROM_CONFIG=$(${pkgs.raspberrypi-eeprom}/bin/rpi-eeprom-config 2>/dev/null || true)
     if [ -n "$EEPROM_CONFIG" ]; then
       TMPCONF=$(mktemp)
       echo "$EEPROM_CONFIG" | sed \
-        -e 's/^BOOT_ORDER=.*/BOOT_ORDER=0xf416/' \
         -e 's/^PCIE_PROBE=.*/PCIE_PROBE=1/' \
         > "$TMPCONF"
-      # Add settings if they don't exist
-      grep -q '^BOOT_ORDER=' "$TMPCONF" || echo "BOOT_ORDER=0xf416" >> "$TMPCONF"
+      # Add PCIE_PROBE if it doesn't exist
       grep -q '^PCIE_PROBE=' "$TMPCONF" || echo "PCIE_PROBE=1" >> "$TMPCONF"
       ${pkgs.raspberrypi-eeprom}/bin/rpi-eeprom-config --apply "$TMPCONF" || {
         echo "WARNING: Failed to apply EEPROM config. You may need to manually set:"
-        echo "  BOOT_ORDER=0xf416"
         echo "  PCIE_PROBE=1"
         echo "  using: sudo rpi-eeprom-config --edit"
       }
@@ -131,7 +136,6 @@ let
     else
       echo "WARNING: Could not read EEPROM config. You may need to manually set:"
       echo "  sudo rpi-eeprom-config --edit"
-      echo "  BOOT_ORDER=0xf416"
       echo "  PCIE_PROBE=1"
     fi
 
@@ -143,9 +147,9 @@ let
     echo "Next steps:"
     echo "  1. Power off the Raspberry Pi"
     echo "  2. Remove the SD card"
-    echo "  3. The Pi should boot from NVMe"
+    echo "  3. The Pi will boot from NVMe (default boot order: SD, USB, NVMe)"
     echo ""
-    echo "EEPROM has been configured with BOOT_ORDER=0xf416 (NVMe first)."
+    echo "EEPROM has been configured with PCIE_PROBE=1."
     echo "The change takes effect on next reboot."
     echo ""
   '';
@@ -178,18 +182,18 @@ in
     services.getty.autologinUser = "root";
 
     # Show install instructions on login
-    users.motd = ''
-
-      ==========================================
-       NixOS NVMe Installer for Raspberry Pi 5
-      ==========================================
-
-      To install NixOS onto the NVMe drive, run:
-
-        install-nvme
-
-      (optionally specify a device: install-nvme /dev/nvme0n1)
-
+    environment.interactiveShellInit = ''
+      echo ""
+      echo "  =========================================="
+      echo "   NixOS NVMe Installer for Raspberry Pi 5"
+      echo "  =========================================="
+      echo ""
+      echo "  To install NixOS onto the NVMe drive, run:"
+      echo ""
+      echo "    install-nvme"
+      echo ""
+      echo "  (optionally specify a device: install-nvme /dev/nvme0n1)"
+      echo ""
     '';
 
     # Ensure NVMe is available in the installer
