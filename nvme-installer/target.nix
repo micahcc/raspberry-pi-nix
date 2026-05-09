@@ -25,6 +25,8 @@ in
       "xhci_hcd"
       "xhci_pci"
       "usbhid"
+      "usb_storage"
+      "uas"
     ];
 
     boot.kernelParams = lib.mkAfter [
