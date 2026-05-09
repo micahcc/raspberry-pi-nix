@@ -108,6 +108,33 @@ let
     echo ">>> Syncing..."
     sync
 
+    echo ">>> Configuring EEPROM boot order for NVMe..."
+    # Set BOOT_ORDER=0xf416 (NVMe first, then SD, then USB, then restart)
+    # Set PCIE_PROBE=1 for non-HAT+ adapters
+    EEPROM_CONFIG=$(${pkgs.raspberrypi-eeprom}/bin/rpi-eeprom-config 2>/dev/null || true)
+    if [ -n "$EEPROM_CONFIG" ]; then
+      TMPCONF=$(mktemp)
+      echo "$EEPROM_CONFIG" | sed \
+        -e 's/^BOOT_ORDER=.*/BOOT_ORDER=0xf416/' \
+        -e 's/^PCIE_PROBE=.*/PCIE_PROBE=1/' \
+        > "$TMPCONF"
+      # Add settings if they don't exist
+      grep -q '^BOOT_ORDER=' "$TMPCONF" || echo "BOOT_ORDER=0xf416" >> "$TMPCONF"
+      grep -q '^PCIE_PROBE=' "$TMPCONF" || echo "PCIE_PROBE=1" >> "$TMPCONF"
+      ${pkgs.raspberrypi-eeprom}/bin/rpi-eeprom-config --apply "$TMPCONF" || {
+        echo "WARNING: Failed to apply EEPROM config. You may need to manually set:"
+        echo "  BOOT_ORDER=0xf416"
+        echo "  PCIE_PROBE=1"
+        echo "  using: sudo rpi-eeprom-config --edit"
+      }
+      rm -f "$TMPCONF"
+    else
+      echo "WARNING: Could not read EEPROM config. You may need to manually set:"
+      echo "  sudo rpi-eeprom-config --edit"
+      echo "  BOOT_ORDER=0xf416"
+      echo "  PCIE_PROBE=1"
+    fi
+
     echo ""
     echo "=========================================="
     echo "Installation complete!"
@@ -118,10 +145,8 @@ let
     echo "  2. Remove the SD card"
     echo "  3. The Pi should boot from NVMe"
     echo ""
-    echo "If the Pi doesn't boot from NVMe, you may need to update"
-    echo "the EEPROM boot order to prioritize NVMe:"
-    echo "  sudo EDITOR=nano rpi-eeprom-config --edit"
-    echo "  Set BOOT_ORDER=0xf416 (NVMe first, then SD, then USB)"
+    echo "EEPROM has been configured with BOOT_ORDER=0xf416 (NVMe first)."
+    echo "The change takes effect on next reboot."
     echo ""
   '';
 in
