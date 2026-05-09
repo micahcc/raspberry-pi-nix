@@ -92,7 +92,6 @@
             self.nixosModules.nvme-installer
             {
               raspberry-pi-nix.board = "bcm2712";
-              users.users.root.initialPassword = "nixos";
               networking.hostName = "rpi5-installer";
               networking.useDHCP = true;
               services.openssh.enable = true;

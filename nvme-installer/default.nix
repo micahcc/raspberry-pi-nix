@@ -82,7 +82,7 @@ let
     mkdir -p "$MOUNT_ROOT/nix/store"
 
     # Copy all store paths needed by the target system
-    ${pkgs.nix}/bin/nix copy --no-check-sigs --to "local?root=$MOUNT_ROOT" "$TARGET_TOPLEVEL"
+    ${pkgs.nix}/bin/nix --extra-experimental-features nix-command copy --no-check-sigs --to "local?root=$MOUNT_ROOT" "$TARGET_TOPLEVEL"
 
     echo ">>> Setting up system profile..."
     mkdir -p "$MOUNT_ROOT/nix/var/nix/profiles"
@@ -173,6 +173,24 @@ in
       pkgs.raspberrypi-eeprom
       pkgs.nix
     ];
+
+    # Auto-login as root (no password prompt)
+    services.getty.autologinUser = "root";
+
+    # Show install instructions on login
+    environment.etc."motd".text = ''
+
+      ==========================================
+       NixOS NVMe Installer for Raspberry Pi 5
+      ==========================================
+
+      To install NixOS onto the NVMe drive, run:
+
+        install-nvme
+
+      (optionally specify a device: install-nvme /dev/nvme0n1)
+
+    '';
 
     # Ensure NVMe is available in the installer
     boot.initrd.availableKernelModules = [ "nvme" ];
