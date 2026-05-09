@@ -36,9 +36,6 @@ in
       "usbhid"
     ];
 
-    # Don't reboot on kernel panic (helps debug)
-    boot.kernel.sysctl."kernel.panic" = 0;
-
     boot.kernelParams = lib.mkAfter [
       "root=LABEL=NIXOS_NVME"
       "rootfstype=ext4"
