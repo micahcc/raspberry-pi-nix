@@ -113,9 +113,7 @@ echo ">>> Configuring EEPROM for NVMe PCIe probe..."
 EEPROM_CONFIG=$("$RPI_EEPROM_CONFIG" 2>/dev/null || true)
 if [ -n "$EEPROM_CONFIG" ]; then
   TMPCONF=$(mktemp)
-  echo "$EEPROM_CONFIG" | sed \
-    -e 's/^PCIE_PROBE=.*/PCIE_PROBE=1/' \
-    > "$TMPCONF"
+  echo "${EEPROM_CONFIG//PCIE_PROBE=*/PCIE_PROBE=1}" > "$TMPCONF"
   # Add PCIE_PROBE if it doesn't exist
   grep -q '^PCIE_PROBE=' "$TMPCONF" || echo "PCIE_PROBE=1" >> "$TMPCONF"
   "$RPI_EEPROM_CONFIG" --apply "$TMPCONF" || {
