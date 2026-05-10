@@ -47,7 +47,7 @@ let
     findmnt -rno SOURCE,TARGET | grep "^''${NVME_DEV}" | while read -r src mnt; do
       echo "    Unmounting $src ($mnt)"
       umount "$mnt" || umount -l "$mnt"
-    done
+    done || true
 
     echo ">>> Partitioning $NVME_DEV..."
     ${pkgs.util-linux}/bin/sfdisk "$NVME_DEV" <<EOF
@@ -98,11 +98,7 @@ let
 
     echo ">>> Installing /sbin/init..."
     mkdir -p "$MOUNT_ROOT/sbin"
-    cat > "$MOUNT_ROOT/sbin/init" <<INITEOF
-    #!${pkgs.bash}/bin/bash
-    exec $TARGET_TOPLEVEL/init
-    INITEOF
-    chmod 755 "$MOUNT_ROOT/sbin/init"
+    ln -sf /nix/var/nix/profiles/system/init "$MOUNT_ROOT/sbin/init"
 
     echo ">>> Creating /etc/NIXOS marker..."
     mkdir -p "$MOUNT_ROOT/etc"
