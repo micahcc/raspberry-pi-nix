@@ -1,13 +1,19 @@
 # Example: NVMe target system configuration.
 # Customize this for your desired NVMe-installed system.
-{ pkgs, lib, ... }: {
+{ pkgs, lib, ... }:
+{
   time.timeZone = "America/Los_Angeles";
 
   users.users.root.initialPassword = "nixos";
   users.users.nixos = {
     isNormalUser = true;
     initialPassword = "nixos";
-    extraGroups = [ "wheel" "gpio" "i2c" "spi" ];
+    extraGroups = [
+      "wheel"
+      "gpio"
+      "i2c"
+      "spi"
+    ];
   };
 
   networking = {

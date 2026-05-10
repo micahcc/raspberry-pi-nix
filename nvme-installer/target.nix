@@ -1,7 +1,12 @@
 # NVMe target system configuration.
 # This defines the NixOS system that will be installed onto the NVMe drive.
 # Users should import this and customize it (add users, services, etc.)
-{ pkgs, lib, config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 
 let
   cfg = config.raspberry-pi-nix;
@@ -53,7 +58,11 @@ in
       "/boot/firmware" = {
         device = "/dev/disk/by-label/FIRMWARE";
         fsType = "vfat";
-        options = [ "noatime" "noauto" "x-systemd.automount" ];
+        options = [
+          "noatime"
+          "noauto"
+          "x-systemd.automount"
+        ];
       };
     };
 

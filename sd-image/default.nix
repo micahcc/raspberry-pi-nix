@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 {
   imports = [ ./sd-image.nix ];
@@ -33,15 +38,16 @@
         kernel = "${config.system.build.kernel}/${config.system.boot.loader.kernelFile}";
         initrd = "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
         populate-kernel =
-          if cfg.uboot.enable
-          then ''
-            cp ${cfg.uboot.package}/u-boot.bin firmware/u-boot-rpi-arm64.bin
-          ''
-          else ''
-            cp "${kernel}" firmware/kernel.img
-            cp "${initrd}" firmware/initrd
-            cp "${kernel-params}" firmware/cmdline.txt
-          '';
+          if cfg.uboot.enable then
+            ''
+              cp ${cfg.uboot.package}/u-boot.bin firmware/u-boot-rpi-arm64.bin
+            ''
+          else
+            ''
+              cp "${kernel}" firmware/kernel.img
+              cp "${initrd}" firmware/initrd
+              cp "${kernel-params}" firmware/cmdline.txt
+            '';
       in
       {
         populateFirmwareCommands = ''
@@ -50,20 +56,21 @@
           cp ${config.hardware.raspberry-pi.config-output} firmware/config.txt
         '';
         populateRootCommands =
-          if cfg.uboot.enable
-          then ''
-            mkdir -p ./files/boot
-            ${config.boot.loader.generic-extlinux-compatible.populateCmd} -c ${config.system.build.toplevel} -d ./files/boot
-          ''
-          else ''
-            mkdir -p ./files/sbin
-            content="$(
-              echo "#!${pkgs.bash}/bin/bash"
-              echo "exec ${config.system.build.toplevel}/init"
-            )"
-            echo "$content" > ./files/sbin/init
-            chmod 744 ./files/sbin/init
-          '';
+          if cfg.uboot.enable then
+            ''
+              mkdir -p ./files/boot
+              ${config.boot.loader.generic-extlinux-compatible.populateCmd} -c ${config.system.build.toplevel} -d ./files/boot
+            ''
+          else
+            ''
+              mkdir -p ./files/sbin
+              content="$(
+                echo "#!${pkgs.bash}/bin/bash"
+                echo "exec ${config.system.build.toplevel}/init"
+              )"
+              echo "$content" > ./files/sbin/init
+              chmod 744 ./files/sbin/init
+            '';
       };
   };
 }

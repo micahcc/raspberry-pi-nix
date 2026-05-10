@@ -1,7 +1,12 @@
 # NVMe installer module for the SD card image.
 # This module configures the SD card system to include an install script
 # that partitions and installs NixOS onto an NVMe drive.
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   # The target NixOS system closure that will be installed to NVMe
@@ -187,10 +192,12 @@ in
     };
 
     # Static IP for reliable SSH access
-    networking.interfaces.end0.ipv4.addresses = [{
-      address = "192.168.1.100";
-      prefixLength = 24;
-    }];
+    networking.interfaces.end0.ipv4.addresses = [
+      {
+        address = "192.168.1.100";
+        prefixLength = 24;
+      }
+    ];
 
     # Show install instructions on login
     environment.interactiveShellInit = ''

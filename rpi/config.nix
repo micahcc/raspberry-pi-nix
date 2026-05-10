@@ -1,51 +1,65 @@
-{ lib, config, pkgs, ... }:
+{
+  lib,
+  config,
+  pkgs,
+  ...
+}:
 let
   cfg = config.hardware.raspberry-pi;
   render-raspberrypi-config =
     let
-      render-options = opts:
-        lib.strings.concatStringsSep "\n" (render-dt-kvs opts);
+      render-options = opts: lib.strings.concatStringsSep "\n" (render-dt-kvs opts);
       render-dt-param = x: "dtparam=" + x;
-      render-dt-kv = k: v:
+      render-dt-kv =
+        k: v:
         if isNull v.value then
           k
         else
-          let vstr = toString v.value; in "${k}=${vstr}";
-      render-dt-kvs = x:
-        lib.attrsets.mapAttrsToList render-dt-kv
-          (lib.filterAttrs (k: v: v.enable) x);
-      render-dt-overlay = { overlay, args }:
-        "dtoverlay=" + overlay + "\n"
-        + lib.strings.concatMapStringsSep "\n" render-dt-param args + "\n"
+          let
+            vstr = toString v.value;
+          in
+          "${k}=${vstr}";
+      render-dt-kvs = x: lib.attrsets.mapAttrsToList render-dt-kv (lib.filterAttrs (k: v: v.enable) x);
+      render-dt-overlay =
+        { overlay, args }:
+        "dtoverlay="
+        + overlay
+        + "\n"
+        + lib.strings.concatMapStringsSep "\n" render-dt-param args
+        + "\n"
         + "dtoverlay=";
-      render-base-dt-params = params:
-        lib.strings.concatMapStringsSep "\n" render-dt-param
-          (render-dt-kvs params);
-      render-dt-overlays = overlays:
-        lib.strings.concatMapStringsSep "\n" render-dt-overlay
-          (lib.attrsets.mapAttrsToList
-            (k: v: {
-              overlay = k;
-              args = render-dt-kvs v.params;
-            })
-            (lib.filterAttrs (k: v: v.enable) overlays));
-      render-config-section = k:
-        { options, base-dt-params, dt-overlays }:
+      render-base-dt-params =
+        params: lib.strings.concatMapStringsSep "\n" render-dt-param (render-dt-kvs params);
+      render-dt-overlays =
+        overlays:
+        lib.strings.concatMapStringsSep "\n" render-dt-overlay (
+          lib.attrsets.mapAttrsToList (k: v: {
+            overlay = k;
+            args = render-dt-kvs v.params;
+          }) (lib.filterAttrs (k: v: v.enable) overlays)
+        );
+      render-config-section =
+        k:
+        {
+          options,
+          base-dt-params,
+          dt-overlays,
+        }:
         let
-          all-config = lib.concatStringsSep "\n" (lib.filter (x: x != "") [
-            (render-options options)
-            (render-base-dt-params base-dt-params)
-            (render-dt-overlays dt-overlays)
-          ]);
+          all-config = lib.concatStringsSep "\n" (
+            lib.filter (x: x != "") [
+              (render-options options)
+              (render-base-dt-params base-dt-params)
+              (render-dt-overlays dt-overlays)
+            ]
+          );
         in
         ''
           [${k}]
           ${all-config}
         '';
     in
-    conf:
-    lib.strings.concatStringsSep "\n"
-      (lib.attrsets.mapAttrsToList render-config-section conf);
+    conf: lib.strings.concatStringsSep "\n" (lib.attrsets.mapAttrsToList render-config-section conf);
 in
 {
   options = {
@@ -55,15 +69,28 @@ in
           rpi-config-param = {
             options = {
               enable = lib.mkEnableOption "attr";
-              value =
-                lib.mkOption { type = with lib.types; oneOf [ int str bool ]; };
+              value = lib.mkOption {
+                type =
+                  with lib.types;
+                  oneOf [
+                    int
+                    str
+                    bool
+                  ];
+              };
             };
           };
           dt-param = {
             options = {
               enable = lib.mkEnableOption "attr";
               value = lib.mkOption {
-                type = with lib.types; nullOr (oneOf [ int str bool ]);
+                type =
+                  with lib.types;
+                  nullOr (oneOf [
+                    int
+                    str
+                    bool
+                  ]);
                 default = null;
               };
             };
@@ -110,7 +137,13 @@ in
               dt-overlays = lib.mkOption {
                 type = with lib.types; attrsOf (submodule dt-overlay);
                 default = { };
-                example = { vc4-kms-v3d = { cma-256 = { enable = true; }; }; };
+                example = {
+                  vc4-kms-v3d = {
+                    cma-256 = {
+                      enable = true;
+                    };
+                  };
+                };
                 description = "dtb overlays to apply";
               };
             };

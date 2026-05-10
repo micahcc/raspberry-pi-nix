@@ -45,11 +45,15 @@
     };
   };
 
-  outputs = srcs@{ self, ... }:
+  outputs =
+    srcs@{ self, ... }:
     let
       pinned = import srcs.nixpkgs {
         system = "aarch64-linux";
-        overlays = with self.overlays; [ core libcamera ];
+        overlays = with self.overlays; [
+          core
+          libcamera
+        ];
       };
     in
     {
@@ -70,7 +74,11 @@
       nixosConfigurations = {
         rpi-example = srcs.nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
-          modules = [ self.nixosModules.raspberry-pi self.nixosModules.sd-image ./example ];
+          modules = [
+            self.nixosModules.raspberry-pi
+            self.nixosModules.sd-image
+            ./example
+          ];
         };
 
         # The NVMe target system (what gets installed on the NVMe)
@@ -90,32 +98,37 @@
             self.nixosModules.raspberry-pi
             self.nixosModules.sd-image
             self.nixosModules.nvme-installer
-            {
-              raspberry-pi-nix.board = "bcm2712";
-              networking.hostName = "rpi5-installer";
-              networking.useDHCP = true;
-              services.openssh.enable = true;
+            (
+              { lib, ... }:
+              {
+                raspberry-pi-nix.board = "bcm2712";
+                # Use the same kernel as the target system (unless overridden)
+                raspberry-pi-nix.kernel-version = lib.mkDefault self.nixosConfigurations.nvme-target.config.raspberry-pi-nix.kernel-version;
+                networking.hostName = "rpi5-installer";
+                networking.useDHCP = true;
+                services.openssh.enable = true;
 
-              hardware.raspberry-pi.config.all.options = {
-                # Without this, HDMI output may not activate if the
-                # display isn't detected during early firmware init.
-                hdmi_force_hotplug = {
-                  enable = true;
-                  value = 1;
+                hardware.raspberry-pi.config.all.options = {
+                  # Without this, HDMI output may not activate if the
+                  # display isn't detected during early firmware init.
+                  hdmi_force_hotplug = {
+                    enable = true;
+                    value = 1;
+                  };
+                  # Without this, the Pi refuses to boot from USB claiming
+                  # insufficient power, even with a capable PSU that doesn't
+                  # negotiate via USB-PD.
+                  usb_max_current_enable = {
+                    enable = true;
+                    value = 1;
+                  };
                 };
-                # Without this, the Pi refuses to boot from USB claiming
-                # insufficient power, even with a capable PSU that doesn't
-                # negotiate via USB-PD.
-                usb_max_current_enable = {
+                nvme-installer = {
                   enable = true;
-                  value = 1;
+                  targetSystem = self.nixosConfigurations.nvme-target;
                 };
-              };
-              nvme-installer = {
-                enable = true;
-                targetSystem = self.nixosConfigurations.nvme-target;
-              };
-            }
+              }
+            )
           ];
         };
       };
@@ -127,18 +140,23 @@
         nvmeInstallerSdImage = self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
       };
 
+      formatter.x86_64-linux = (import srcs.nixpkgs { system = "x86_64-linux"; }).nixfmt-rfc-style;
+      formatter.aarch64-linux = pinned.nixfmt-rfc-style;
+
       checks.aarch64-linux = self.packages.aarch64-linux;
-      packages.aarch64-linux = with pinned.lib;
+      packages.aarch64-linux =
+        with pinned.lib;
         let
-          kernels =
-            foldlAttrs f { } pinned.rpi-kernels;
-          f = acc: kernel-version: board-attr-set:
-            foldlAttrs
-              (acc: board-version: drv: acc // {
-                "linux-${kernel-version}-${board-version}" = drv;
-              })
+          kernels = foldlAttrs f { } pinned.rpi-kernels;
+          f =
+            acc: kernel-version: board-attr-set:
+            foldlAttrs (
+              acc: board-version: drv:
               acc
-              board-attr-set;
+              // {
+                "linux-${kernel-version}-${board-version}" = drv;
+              }
+            ) acc board-attr-set;
         in
         {
           example-sd-image = self.nixosConfigurations.rpi-example.config.system.build.sdImage;
@@ -147,6 +165,7 @@
           libcamera = pinned.libcamera;
           wireless-firmware = pinned.raspberrypiWirelessFirmware;
           uboot-rpi-arm64 = pinned.uboot-rpi-arm64;
-        } // kernels;
+        }
+        // kernels;
     };
 }

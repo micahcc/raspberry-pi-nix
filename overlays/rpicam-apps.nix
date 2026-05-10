@@ -1,4 +1,9 @@
-{ rpicam-apps-src, lib, pkgs, stdenv }:
+{
+  rpicam-apps-src,
+  lib,
+  pkgs,
+  stdenv,
+}:
 
 stdenv.mkDerivation {
   pname = "libcamera-apps";
@@ -6,8 +11,22 @@ stdenv.mkDerivation {
 
   src = rpicam-apps-src;
 
-  nativeBuildInputs = with pkgs; [ meson pkg-config ];
-  buildInputs = with pkgs; [ libjpeg libtiff libcamera libepoxy boost libexif libpng ffmpeg libdrm ninja ];
+  nativeBuildInputs = with pkgs; [
+    meson
+    pkg-config
+  ];
+  buildInputs = with pkgs; [
+    libjpeg
+    libtiff
+    libcamera
+    libepoxy
+    boost
+    libexif
+    libpng
+    ffmpeg
+    libdrm
+    ninja
+  ];
   mesonFlags = [
     "-Denable_qt=disabled"
     "-Denable_opencv=disabled"
