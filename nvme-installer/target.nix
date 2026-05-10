@@ -45,9 +45,6 @@ in
       "root=LABEL=NIXOS_NVME"
       "rootfstype=ext4"
       "rootwait"
-      # Override firmware's pci=pcie_bus_safe which prevents MSI-X
-      # allocation on RP1, breaking USB and Ethernet
-      "pci=pcie_bus_perf"
     ];
 
     fileSystems = {

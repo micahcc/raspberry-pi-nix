@@ -2,6 +2,8 @@
 # Customize this for your desired NVMe-installed system.
 { pkgs, lib, ... }:
 {
+  raspberry-pi-nix.board = "bcm2712";
+
   time.timeZone = "America/Los_Angeles";
 
   users.users.root.initialPassword = "nixos";
@@ -18,25 +20,32 @@
 
   networking = {
     hostName = "rpi5-nvme";
-    useDHCP = false;
-    interfaces = {
-      wlan0.useDHCP = true;
-      eth0.useDHCP = true;
-    };
+    useDHCP = true;
   };
 
   services.openssh.enable = true;
 
   hardware.raspberry-pi.config = {
     all = {
-      base-dt-params = {
-        BOOT_UART = {
-          value = 1;
+      options = {
+        hdmi_force_hotplug = {
           enable = true;
+          value = 1;
         };
-        uart_2ndstage = {
-          value = 1;
+        usb_max_current_enable = {
           enable = true;
+          value = 1;
+        };
+      };
+      base-dt-params = {
+        # Enable PCIe for NVMe
+        pciex1 = {
+          enable = true;
+          value = 1;
+        };
+        pciex1_gen = {
+          enable = true;
+          value = 3;
         };
       };
       dt-overlays = {
