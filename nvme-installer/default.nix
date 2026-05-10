@@ -174,10 +174,27 @@ in
       pkgs.util-linux
       pkgs.raspberrypi-eeprom
       pkgs.nix
+      pkgs.vim
     ];
 
     # Auto-login as root (no password prompt)
     services.getty.autologinUser = "root";
+    users.users.root.initialPassword = "nixos";
+
+    # Allow root SSH with password
+    services.openssh = {
+      enable = true;
+      settings = {
+        PermitRootLogin = "yes";
+        PasswordAuthentication = true;
+      };
+    };
+
+    # Static IP for reliable SSH access
+    networking.interfaces.end0.ipv4.addresses = [{
+      address = "192.168.1.100";
+      prefixLength = 24;
+    }];
 
     # Show install instructions on login
     environment.interactiveShellInit = ''
@@ -185,6 +202,10 @@ in
       echo "  =========================================="
       echo "   NixOS NVMe Installer for Raspberry Pi 5"
       echo "  =========================================="
+      echo ""
+      echo "  SSH access:"
+      echo "    ssh root@192.168.1.100"
+      echo "    password: nixos"
       echo ""
       echo "  To install NixOS onto the NVMe drive, run:"
       echo ""
