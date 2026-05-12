@@ -72,7 +72,6 @@
         sd-image = import ./sd-image;
         nvme-installer = import ./nvme-installer;
         nvme-target = import ./nvme-installer/target.nix;
-        emmc-installer = import ./emmc-installer;
         emmc-target = import ./emmc-installer/target.nix;
       };
       nixosConfigurations = {
@@ -134,7 +133,7 @@
           ];
         };
 
-        # The eMMC target system (what gets installed on the eMMC)
+        # The eMMC target system (what gets flashed onto the eMMC)
         emmc-target = srcs.nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
           modules = [
@@ -144,36 +143,6 @@
           ];
         };
 
-        # The SD card installer image (boots from SD, installs to eMMC)
-        emmc-installer = srcs.nixpkgs.lib.nixosSystem {
-          system = "aarch64-linux";
-          modules = [
-            self.nixosModules.raspberry-pi
-            self.nixosModules.sd-image
-            self.nixosModules.emmc-installer
-            ({ lib, ... }: {
-              raspberry-pi-nix.board = "bcm2711";
-              networking.hostName = "rpi-cm4-installer";
-              networking.useDHCP = true;
-              services.openssh.enable = true;
-
-              hardware.raspberry-pi.config.all.options = {
-                hdmi_force_hotplug = {
-                  enable = true;
-                  value = 1;
-                };
-                usb_max_current_enable = {
-                  enable = true;
-                  value = 1;
-                };
-              };
-              emmc-installer = {
-                enable = true;
-                targetSystem = self.nixosConfigurations.emmc-target;
-              };
-            })
-          ];
-        };
       };
       # Example: building nvmeInstallerSdImage independently from sdImage.
       #   nix build .#raspberrypis.rpi5.nvmeInstallerSdImage
@@ -185,8 +154,8 @@
           self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
       };
       raspberrypis.cm4 = {
-        emmcInstallerSdImage =
-          self.nixosConfigurations.emmc-installer.config.system.build.sdImage;
+        emmcImage =
+          self.nixosConfigurations.emmc-target.config.system.build.emmcImage;
       };
 
       formatter.x86_64-linux = (srcs.treefmt-nix.lib.evalModule
@@ -209,8 +178,12 @@
             self.nixosConfigurations.rpi-example.config.system.build.sdImage;
           nvme-installer-sd-image =
             self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
-          emmc-installer-sd-image =
-            self.nixosConfigurations.emmc-installer.config.system.build.sdImage;
+          emmc-image =
+            self.nixosConfigurations.emmc-target.config.system.build.emmcImage;
+          flash-emmc = import ./emmc-installer {
+            pkgs = pinned;
+            emmcImage = self.nixosConfigurations.emmc-target.config.system.build.emmcImage;
+          };
           firmware = pinned.raspberrypifw;
           libcamera = pinned.libcamera;
           wireless-firmware = pinned.raspberrypiWirelessFirmware;
@@ -228,8 +201,12 @@
           self.nixosConfigurations.rpi-example.config.system.build.sdImage;
         nvme-installer-sd-image =
           self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
-        emmc-installer-sd-image =
-          self.nixosConfigurations.emmc-installer.config.system.build.sdImage;
+        emmc-image =
+          self.nixosConfigurations.emmc-target.config.system.build.emmcImage;
+        flash-emmc = import ./emmc-installer {
+          pkgs = import srcs.nixpkgs { system = "x86_64-linux"; };
+          emmcImage = self.nixosConfigurations.emmc-target.config.system.build.emmcImage;
+        };
         uboot-rpi-arm64 = pkgsCross.buildUBoot {
           defconfig = "rpi_arm64_defconfig";
           extraMeta.platforms = [ "aarch64-linux" ];

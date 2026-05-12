@@ -3,8 +3,9 @@
 # Users should import this and customize it (add users, services, etc.)
 { pkgs, lib, config, ... }:
 
-let fw = import ../lib/firmware.nix { inherit lib pkgs config; };
-in {
+{
+  imports = [ ./emmc-image.nix ];
+
   config = {
     raspberry-pi-nix.board = lib.mkDefault "bcm2711";
 
@@ -36,11 +37,24 @@ in {
       };
     };
 
-    # The eMMC target builds the firmware partition contents as a derivation
-    # so the installer can copy them.
-    system.build.emmcFirmware = pkgs.runCommand "emmc-firmware" { } ''
-      mkdir -p $out
-      ${fw.populateFirmwareDir "$out"}
+    # Expand root partition on first boot (image is sized to fit contents)
+    boot.postBootCommands = ''
+      if [ -f /nix-path-registration ]; then
+        set -euo pipefail
+        rootPart=$(${pkgs.util-linux}/bin/findmnt -n -o SOURCE /)
+        bootDevice=$(lsblk -npo PKNAME $rootPart)
+        partNum=$(lsblk -npo PARTN $rootPart)
+
+        echo ",+," | sfdisk -N$partNum --no-reread $bootDevice
+        ${pkgs.parted}/bin/partprobe
+        ${pkgs.e2fsprogs}/bin/resize2fs $rootPart
+
+        ${config.nix.package.out}/bin/nix-store --load-db < /nix-path-registration
+        touch /etc/NIXOS
+        ${config.nix.package.out}/bin/nix-env -p /nix/var/nix/profiles/system --set /run/current-system
+
+        rm -f /nix-path-registration
+      fi
     '';
   };
 }
