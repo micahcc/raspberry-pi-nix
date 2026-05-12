@@ -48,64 +48,69 @@ in {
   };
 
   config = {
-    system.build.emmcImage = pkgs.callPackage ({ stdenv, dosfstools, e2fsprogs
-      , mtools, libfaketime, util-linux, zstd }:
-      stdenv.mkDerivation {
-        name = "nixos-emmc-image-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}.img";
+    system.build.emmcImage = pkgs.callPackage
+      ({ stdenv, dosfstools, e2fsprogs, mtools, libfaketime, util-linux, zstd }:
+        stdenv.mkDerivation {
+          name =
+            "nixos-emmc-image-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}.img";
 
-        nativeBuildInputs =
-          [ dosfstools e2fsprogs mtools libfaketime util-linux zstd ];
+          nativeBuildInputs =
+            [ dosfstools e2fsprogs mtools libfaketime util-linux zstd ];
 
-        inherit (config.emmcImage) compressImage;
+          inherit (config.emmcImage) compressImage;
 
-        buildCommand = ''
-          mkdir -p $out/nix-support $out/emmc-image
-          export img=$out/emmc-image/nixos-emmc.img
+          buildCommand = ''
+            mkdir -p $out/nix-support $out/emmc-image
+            export img=$out/emmc-image/nixos-emmc.img
 
-          echo "${pkgs.stdenv.buildPlatform.system}" > $out/nix-support/system
-          if test -n "$compressImage"; then
-            echo "file emmc-image $img.zst" >> $out/nix-support/hydra-build-products
-          else
-            echo "file emmc-image $img" >> $out/nix-support/hydra-build-products
-          fi
+            echo "${pkgs.stdenv.buildPlatform.system}" > $out/nix-support/system
+            if test -n "$compressImage"; then
+              echo "file emmc-image $img.zst" >> $out/nix-support/hydra-build-products
+            else
+              echo "file emmc-image $img" >> $out/nix-support/hydra-build-products
+            fi
 
-          echo "Decompressing rootfs image"
-          zstd -d --no-progress "${rootfsImage}" -o ./root-fs.img
+            echo "Decompressing rootfs image"
+            zstd -d --no-progress "${rootfsImage}" -o ./root-fs.img
 
-          gap=${toString config.emmcImage.firmwarePartitionOffset}
+            gap=${toString config.emmcImage.firmwarePartitionOffset}
 
-          rootSizeBlocks=$(du -B 512 --apparent-size ./root-fs.img | awk '{ print $1 }')
-          firmwareSizeBlocks=$((${toString config.emmcImage.firmwareSize} * 1024 * 1024 / 512))
-          imageSize=$((rootSizeBlocks * 512 + firmwareSizeBlocks * 512 + gap * 1024 * 1024))
-          truncate -s $imageSize $img
+            rootSizeBlocks=$(du -B 512 --apparent-size ./root-fs.img | awk '{ print $1 }')
+            firmwareSizeBlocks=$((${
+              toString config.emmcImage.firmwareSize
+            } * 1024 * 1024 / 512))
+            imageSize=$((rootSizeBlocks * 512 + firmwareSizeBlocks * 512 + gap * 1024 * 1024))
+            truncate -s $imageSize $img
 
-          sfdisk $img <<EOF
-              label: dos
+            sfdisk $img <<EOF
+                label: dos
 
-              start=''${gap}M, size=$firmwareSizeBlocks, type=b
-              start=$((gap + ${toString config.emmcImage.firmwareSize}))M, type=83
-          EOF
+                start=''${gap}M, size=$firmwareSizeBlocks, type=b
+                start=$((gap + ${
+                  toString config.emmcImage.firmwareSize
+                }))M, type=83
+            EOF
 
-          # Copy rootfs into the image
-          eval $(partx $img -o START,SECTORS --nr 2 --pairs)
-          dd conv=notrunc if=./root-fs.img of=$img seek=$START count=$SECTORS
+            # Copy rootfs into the image
+            eval $(partx $img -o START,SECTORS --nr 2 --pairs)
+            dd conv=notrunc if=./root-fs.img of=$img seek=$START count=$SECTORS
 
-          # Create and populate firmware partition
-          eval $(partx $img -o START,SECTORS --nr 1 --pairs)
-          truncate -s $((SECTORS * 512)) firmware_part.img
-          faketime "1970-01-01 00:00:00" mkfs.vfat -F 32 -n FIRMWARE firmware_part.img
+            # Create and populate firmware partition
+            eval $(partx $img -o START,SECTORS --nr 1 --pairs)
+            truncate -s $((SECTORS * 512)) firmware_part.img
+            faketime "1970-01-01 00:00:00" mkfs.vfat -F 32 -n FIRMWARE firmware_part.img
 
-          mkdir firmware
-          ${fw.populateFirmwareDir "firmware"}
+            mkdir firmware
+            ${fw.populateFirmwareDir "firmware"}
 
-          (cd firmware; mcopy -psvm -i ../firmware_part.img ./* ::)
-          fsck.vfat -vn firmware_part.img
-          dd conv=notrunc if=firmware_part.img of=$img seek=$START count=$SECTORS
+            (cd firmware; mcopy -psvm -i ../firmware_part.img ./* ::)
+            fsck.vfat -vn firmware_part.img
+            dd conv=notrunc if=firmware_part.img of=$img seek=$START count=$SECTORS
 
-          if test -n "$compressImage"; then
-              zstd -T$NIX_BUILD_CORES --rm $img
-          fi
-        '';
-      }) { };
+            if test -n "$compressImage"; then
+                zstd -T$NIX_BUILD_CORES --rm $img
+            fi
+          '';
+        }) { };
   };
 }

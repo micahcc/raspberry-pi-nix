@@ -3,6 +3,7 @@ set -euo pipefail
 
 RPIBOOT="@rpiboot@"
 ZSTD="@zstd@"
+LSUSB="@lsusb@"
 IMAGE="@image@"
 
 usage() {
@@ -16,8 +17,8 @@ usage() {
   echo "  3. Power on the CM"
   echo "  4. Run this script"
   echo ""
-  echo "If no device is specified, rpiboot will expose the eMMC and"
-  echo "the script will auto-detect the new block device."
+  echo "If no device is specified, the script will auto-detect the CM eMMC."
+  echo "If the eMMC is not yet exposed, rpiboot will be run automatically."
 }
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
@@ -30,29 +31,66 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
+# Find block devices backed by usb-storage with a Raspberry Pi USB ancestor
+find_rpi_emmc() {
+  for dev in /sys/block/sd*; do
+    [ -d "$dev" ] || continue
+    # Check the device uses usb-storage
+    if readlink -f "$dev/device" | grep -q "usb-storage"; then
+      # Walk up to find the USB device and check vendor/product
+      usb_dev=$(readlink -f "$dev/device/../..")
+      if [ -f "$usb_dev/idVendor" ] && [ -f "$usb_dev/idProduct" ]; then
+        vendor=$(cat "$usb_dev/idVendor")
+        product=$(cat "$usb_dev/idProduct")
+        # Broadcom RPi: 0a5c:0104
+        if [ "$vendor" = "0a5c" ] && [ "$product" = "0104" ]; then
+          echo "/dev/$(basename "$dev")"
+          return 0
+        fi
+      fi
+    fi
+  done
+  return 1
+}
+
+# Check if RPi is connected in USB boot mode (before rpiboot exposes eMMC)
+rpi_in_boot_mode() {
+  "$LSUSB" -d 2e8a:0003 > /dev/null 2>&1 || "$LSUSB" -d 0a5c:0001 > /dev/null 2>&1
+}
+
 TARGET_DEV="${1:-}"
 
 if [ -z "$TARGET_DEV" ]; then
-  echo ">>> Running rpiboot to expose eMMC as USB mass storage..."
-  # Capture block devices before rpiboot
-  BEFORE=$(lsblk -dnpo NAME 2>/dev/null || true)
+  # First check if eMMC is already exposed (rpiboot already ran)
+  if TARGET_DEV=$(find_rpi_emmc); then
+    echo ">>> Found Raspberry Pi eMMC already exposed: $TARGET_DEV"
+  elif rpi_in_boot_mode; then
+    echo ">>> Raspberry Pi detected in USB boot mode, running rpiboot..."
+    "$RPIBOOT"
 
-  "$RPIBOOT"
+    echo ">>> Waiting for eMMC block device to appear..."
+    for attempt in $(seq 1 30); do
+      if TARGET_DEV=$(find_rpi_emmc); then
+        break
+      fi
+      printf "\r    waiting... (%ds)" "$attempt"
+      sleep 1
+    done
+    echo ""
 
-  echo ">>> Waiting for eMMC block device to appear..."
-  for _i in $(seq 1 30); do
-    AFTER=$(lsblk -dnpo NAME 2>/dev/null || true)
-    NEW_DEV=$(comm -13 <(echo "$BEFORE" | sort) <(echo "$AFTER" | sort) | head -1)
-    if [ -n "$NEW_DEV" ]; then
-      TARGET_DEV="$NEW_DEV"
-      break
+    if [ -z "$TARGET_DEV" ]; then
+      echo "Error: No Raspberry Pi eMMC device appeared after rpiboot."
+      exit 1
     fi
-    sleep 1
-  done
-
-  if [ -z "$TARGET_DEV" ]; then
-    echo "Error: No new block device appeared after rpiboot."
-    echo "Check that the CM is in USB boot mode and connected."
+  else
+    echo "Error: No Raspberry Pi Compute Module detected."
+    echo ""
+    echo "Ensure that:"
+    echo "  - The 'disable eMMC boot' jumper is set"
+    echo "  - The IO board is connected via USB to this computer"
+    echo "  - The CM is powered on"
+    echo ""
+    echo "You can also specify the device manually: flash-emmc /dev/sdX"
     exit 1
   fi
 fi

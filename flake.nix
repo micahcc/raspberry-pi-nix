@@ -182,7 +182,8 @@
             self.nixosConfigurations.emmc-target.config.system.build.emmcImage;
           flash-emmc = import ./emmc-installer {
             pkgs = pinned;
-            emmcImage = self.nixosConfigurations.emmc-target.config.system.build.emmcImage;
+            emmcImage =
+              self.nixosConfigurations.emmc-target.config.system.build.emmcImage;
           };
           firmware = pinned.raspberrypifw;
           libcamera = pinned.libcamera;
@@ -205,7 +206,8 @@
           self.nixosConfigurations.emmc-target.config.system.build.emmcImage;
         flash-emmc = import ./emmc-installer {
           pkgs = import srcs.nixpkgs { system = "x86_64-linux"; };
-          emmcImage = self.nixosConfigurations.emmc-target.config.system.build.emmcImage;
+          emmcImage =
+            self.nixosConfigurations.emmc-target.config.system.build.emmcImage;
         };
         uboot-rpi-arm64 = pkgsCross.buildUBoot {
           defconfig = "rpi_arm64_defconfig";
