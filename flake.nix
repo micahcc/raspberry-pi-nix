@@ -68,6 +68,7 @@
           core-overlay = self.overlays.core;
           libcamera-overlay = self.overlays.libcamera;
         };
+        default = self.nixosModules.raspberry-pi;
         sd-image = import ./sd-image;
         nvme-installer = import ./nvme-installer;
         nvme-target = import ./nvme-installer/target.nix;
@@ -166,5 +167,23 @@
           wireless-firmware = pinned.raspberrypiWirelessFirmware;
           uboot-rpi-arm64 = pinned.uboot-rpi-arm64;
         } // kernels;
+
+      # Cross-compilation support: build aarch64 images from x86_64 machines.
+      packages.x86_64-linux = let
+        pkgsCross = import srcs.nixpkgs {
+          system = "x86_64-linux";
+          crossSystem.system = "aarch64-linux";
+        };
+      in {
+        example-sd-image =
+          self.nixosConfigurations.rpi-example.config.system.build.sdImage;
+        nvme-installer-sd-image =
+          self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
+        uboot-rpi-arm64 = pkgsCross.buildUBoot {
+          defconfig = "rpi_arm64_defconfig";
+          extraMeta.platforms = [ "aarch64-linux" ];
+          filesToInstall = [ "u-boot.bin" ];
+        };
+      };
     };
 }

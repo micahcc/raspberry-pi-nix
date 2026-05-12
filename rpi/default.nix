@@ -14,7 +14,7 @@ in {
     raspberry-pi-nix = {
       kernel-version = mkOption {
         default = "v6_6_51";
-        type = types.str;
+        type = types.enum (import ../lib/kernel-versions.nix);
         description = "Kernel version to build.";
       };
       board = mkOption {
