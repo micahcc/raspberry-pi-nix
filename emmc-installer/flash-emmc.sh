@@ -40,7 +40,7 @@ if [ -z "$TARGET_DEV" ]; then
   "$RPIBOOT"
 
   echo ">>> Waiting for eMMC block device to appear..."
-  for i in $(seq 1 30); do
+  for _i in $(seq 1 30); do
     AFTER=$(lsblk -dnpo NAME 2>/dev/null || true)
     NEW_DEV=$(comm -13 <(echo "$BEFORE" | sort) <(echo "$AFTER" | sort) | head -1)
     if [ -n "$NEW_DEV" ]; then
