@@ -17,35 +17,26 @@
 # The derivation for the SD image will be placed in
 # config.system.build.sdImage
 
-{
-  modulesPath,
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ modulesPath, config, lib, pkgs, ... }:
 
 with lib;
 
 let
-  rootfsImage = pkgs.callPackage "${modulesPath}/../lib/make-ext4-fs.nix" (
-    {
-      inherit (config.sdImage) storePaths;
-      compressImage = true;
-      populateImageCommands = config.sdImage.populateRootCommands;
-      volumeLabel = "NIXOS_SD";
-    }
-    // optionalAttrs (config.sdImage.rootPartitionUUID != null) {
-      uuid = config.sdImage.rootPartitionUUID;
-    }
-  );
-in
-{
+  rootfsImage = pkgs.callPackage "${modulesPath}/../lib/make-ext4-fs.nix" ({
+    inherit (config.sdImage) storePaths;
+    compressImage = true;
+    populateImageCommands = config.sdImage.populateRootCommands;
+    volumeLabel = "NIXOS_SD";
+  } // optionalAttrs (config.sdImage.rootPartitionUUID != null) {
+    uuid = config.sdImage.rootPartitionUUID;
+  });
+in {
   imports = [ ];
 
   options.sdImage = {
     imageName = mkOption {
-      default = "${config.sdImage.imageBaseName}-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}.img";
+      default =
+        "${config.sdImage.imageBaseName}-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}.img";
       description = ''
         Name of the generated image file.
       '';
@@ -110,7 +101,8 @@ in
     };
 
     populateFirmwareCommands = mkOption {
-      example = literalExpression "'' cp \${pkgs.myBootLoader}/u-boot.bin firmware/ ''";
+      example =
+        literalExpression "'' cp \${pkgs.myBootLoader}/u-boot.bin firmware/ ''";
       description = ''
         Shell commands to populate the ./firmware directory.
         All files in that directory are copied to the
@@ -119,7 +111,8 @@ in
     };
 
     populateRootCommands = mkOption {
-      example = literalExpression "''\${config.boot.loader.generic-extlinux-compatible.populateCmd} -c \${config.system.build.toplevel} -d ./files/boot''";
+      example = literalExpression
+        "''\${config.boot.loader.generic-extlinux-compatible.populateCmd} -c \${config.system.build.toplevel} -d ./files/boot''";
       description = ''
         Shell commands to populate the ./files directory.
         All files in that directory are copied to the
@@ -129,7 +122,8 @@ in
     };
 
     postBuildCommands = mkOption {
-      example = literalExpression "'' dd if=\${pkgs.myBootLoader}/SPL of=$img bs=1024 seek=1 conv=notrunc ''";
+      example = literalExpression
+        "'' dd if=\${pkgs.myBootLoader}/SPL of=$img bs=1024 seek=1 conv=notrunc ''";
       default = "";
       description = ''
         Shell commands to run after the image is built.
@@ -158,7 +152,8 @@ in
   config = {
     fileSystems = {
       "/boot/firmware" = {
-        device = "/dev/disk/by-label/${config.raspberry-pi-nix.firmware-partition-label}";
+        device =
+          "/dev/disk/by-label/${config.raspberry-pi-nix.firmware-partition-label}";
         fsType = "vfat";
       };
       "/" = {
@@ -169,27 +164,13 @@ in
 
     sdImage.storePaths = [ config.system.build.toplevel ];
 
-    system.build.sdImage = pkgs.callPackage (
-      {
-        stdenv,
-        dosfstools,
-        e2fsprogs,
-        mtools,
-        libfaketime,
-        util-linux,
-        zstd,
-      }:
+    system.build.sdImage = pkgs.callPackage ({ stdenv, dosfstools, e2fsprogs
+      , mtools, libfaketime, util-linux, zstd, }:
       stdenv.mkDerivation {
         name = config.sdImage.imageName;
 
-        nativeBuildInputs = [
-          dosfstools
-          e2fsprogs
-          mtools
-          libfaketime
-          util-linux
-          zstd
-        ];
+        nativeBuildInputs =
+          [ dosfstools e2fsprogs mtools libfaketime util-linux zstd ];
 
         inherit (config.sdImage) compressImage;
 
@@ -212,7 +193,9 @@ in
 
           # Create the image file sized to fit /boot/firmware and /, plus slack for the gap.
           rootSizeBlocks=$(du -B 512 --apparent-size ./root-fs.img | awk '{ print $1 }')
-          firmwareSizeBlocks=$((${toString config.sdImage.firmwareSize} * 1024 * 1024 / 512))
+          firmwareSizeBlocks=$((${
+            toString config.sdImage.firmwareSize
+          } * 1024 * 1024 / 512))
           imageSize=$((rootSizeBlocks * 512 + firmwareSizeBlocks * 512 + gap * 1024 * 1024))
           truncate -s $imageSize $img
 
@@ -224,7 +207,9 @@ in
               label-id: ${config.sdImage.firmwarePartitionID}
 
               start=''${gap}M, size=$firmwareSizeBlocks, type=b
-              start=$((gap + ${toString config.sdImage.firmwareSize}))M, type=83, bootable
+              start=$((gap + ${
+                toString config.sdImage.firmwareSize
+              }))M, type=83, bootable
           EOF
 
           # Copy the rootfs into the SD image
@@ -252,8 +237,7 @@ in
               zstd -T$NIX_BUILD_CORES --rm $img
           fi
         '';
-      }
-    ) { };
+      }) { };
 
     boot.postBootCommands = lib.mkIf config.sdImage.expandOnBoot ''
       # On the first boot do some maintenance tasks

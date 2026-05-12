@@ -1,20 +1,12 @@
-{
-  rpicam-apps-src,
-  lib,
-  pkgs,
-  stdenv,
-}:
+{ rpicam-apps-src, lib, pkgs, stdenv, }:
 
 stdenv.mkDerivation {
   pname = "libcamera-apps";
-  version = "v1.5.0";
+  version = "v1.5.2";
 
   src = rpicam-apps-src;
 
-  nativeBuildInputs = with pkgs; [
-    meson
-    pkg-config
-  ];
+  nativeBuildInputs = with pkgs; [ meson ninja pkg-config ];
   buildInputs = with pkgs; [
     libjpeg
     libtiff
@@ -25,7 +17,6 @@ stdenv.mkDerivation {
     libpng
     ffmpeg
     libdrm
-    ninja
   ];
   mesonFlags = [
     "-Denable_qt=disabled"

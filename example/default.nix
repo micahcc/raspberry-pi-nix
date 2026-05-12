@@ -1,5 +1,4 @@
-{ pkgs, lib, ... }:
-{
+{ pkgs, lib, ... }: {
   time.timeZone = "America/New_York";
   users.users.root.initialPassword = "root";
   networking = {

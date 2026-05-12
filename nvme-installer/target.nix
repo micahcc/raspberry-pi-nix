@@ -1,25 +1,21 @@
 # NVMe target system configuration.
 # This defines the NixOS system that will be installed onto the NVMe drive.
 # Users should import this and customize it (add users, services, etc.)
-{
-  pkgs,
-  lib,
-  config,
-  ...
-}:
+{ pkgs, lib, config, ... }:
 
 let
   cfg = config.raspberry-pi-nix;
-  kernel = "${config.system.build.kernel}/${config.system.boot.loader.kernelFile}";
-  initrd = "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
+  kernel =
+    "${config.system.build.kernel}/${config.system.boot.loader.kernelFile}";
+  initrd =
+    "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
   kernel-params = pkgs.writeTextFile {
     name = "cmdline.txt";
     text = ''
       ${lib.strings.concatStringsSep " " config.boot.kernelParams}
     '';
   };
-in
-{
+in {
   config = {
     raspberry-pi-nix.board = lib.mkDefault "bcm2712";
     raspberry-pi-nix.kernel-version = lib.mkDefault "v6_12_87";
@@ -35,17 +31,10 @@ in
     ];
 
     # Ensure USB modules stay loaded after boot
-    boot.kernelModules = [
-      "xhci_hcd"
-      "xhci_pci"
-      "usbhid"
-    ];
+    boot.kernelModules = [ "xhci_hcd" "xhci_pci" "usbhid" ];
 
-    boot.kernelParams = lib.mkAfter [
-      "root=LABEL=NIXOS_NVME"
-      "rootfstype=ext4"
-      "rootwait"
-    ];
+    boot.kernelParams =
+      lib.mkAfter [ "root=LABEL=NIXOS_NVME" "rootfstype=ext4" "rootwait" ];
 
     fileSystems = {
       "/" = {
@@ -55,11 +44,7 @@ in
       "/boot/firmware" = {
         device = "/dev/disk/by-label/FIRMWARE";
         fsType = "vfat";
-        options = [
-          "noatime"
-          "noauto"
-          "x-systemd.automount"
-        ];
+        options = [ "noatime" "noauto" "x-systemd.automount" ];
       };
     };
 

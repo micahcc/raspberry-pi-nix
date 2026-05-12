@@ -1,14 +1,7 @@
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ config, lib, pkgs, ... }:
 
-let
-  cfg = config.hardware.raspberry-pi.i2c;
-in
-{
+let cfg = config.hardware.raspberry-pi.i2c;
+in {
   options.hardware.raspberry-pi.i2c = {
     enable = lib.mkEnableOption "configuration for i2c";
   };

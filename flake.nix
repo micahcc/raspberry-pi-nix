@@ -37,29 +37,30 @@
     };
     libcamera-src = {
       flake = false;
-      url = "github:raspberrypi/libcamera/69a894c4adad524d3063dd027f5c4774485cf9db"; # v0.3.1+rpt20240906
+      url =
+        "github:raspberrypi/libcamera/69a894c4adad524d3063dd027f5c4774485cf9db"; # v0.3.1+rpt20240906
     };
     libpisp-src = {
       flake = false;
       url = "github:raspberrypi/libpisp/v1.0.7";
     };
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs =
-    srcs@{ self, ... }:
+  outputs = srcs@{ self, ... }:
     let
       pinned = import srcs.nixpkgs {
         system = "aarch64-linux";
-        overlays = with self.overlays; [
-          core
-          libcamera
-        ];
+        overlays = with self.overlays; [ core libcamera ];
       };
-    in
-    {
+    in {
       overlays = {
         core = import ./overlays (builtins.removeAttrs srcs [ "self" ]);
-        libcamera = import ./overlays/libcamera.nix (builtins.removeAttrs srcs [ "self" ]);
+        libcamera = import ./overlays/libcamera.nix
+          (builtins.removeAttrs srcs [ "self" ]);
       };
       nixosModules = {
         raspberry-pi = import ./rpi {
@@ -98,37 +99,35 @@
             self.nixosModules.raspberry-pi
             self.nixosModules.sd-image
             self.nixosModules.nvme-installer
-            (
-              { lib, ... }:
-              {
-                raspberry-pi-nix.board = "bcm2712";
-                # Use the same kernel as the target system (unless overridden)
-                raspberry-pi-nix.kernel-version = lib.mkDefault self.nixosConfigurations.nvme-target.config.raspberry-pi-nix.kernel-version;
-                networking.hostName = "rpi5-installer";
-                networking.useDHCP = true;
-                services.openssh.enable = true;
+            ({ lib, ... }: {
+              raspberry-pi-nix.board = "bcm2712";
+              # Use the same kernel as the target system (unless overridden)
+              raspberry-pi-nix.kernel-version = lib.mkDefault
+                self.nixosConfigurations.nvme-target.config.raspberry-pi-nix.kernel-version;
+              networking.hostName = "rpi5-installer";
+              networking.useDHCP = true;
+              services.openssh.enable = true;
 
-                hardware.raspberry-pi.config.all.options = {
-                  # Without this, HDMI output may not activate if the
-                  # display isn't detected during early firmware init.
-                  hdmi_force_hotplug = {
-                    enable = true;
-                    value = 1;
-                  };
-                  # Without this, the Pi refuses to boot from USB claiming
-                  # insufficient power, even with a capable PSU that doesn't
-                  # negotiate via USB-PD.
-                  usb_max_current_enable = {
-                    enable = true;
-                    value = 1;
-                  };
-                };
-                nvme-installer = {
+              hardware.raspberry-pi.config.all.options = {
+                # Without this, HDMI output may not activate if the
+                # display isn't detected during early firmware init.
+                hdmi_force_hotplug = {
                   enable = true;
-                  targetSystem = self.nixosConfigurations.nvme-target;
+                  value = 1;
                 };
-              }
-            )
+                # Without this, the Pi refuses to boot from USB claiming
+                # insufficient power, even with a capable PSU that doesn't
+                # negotiate via USB-PD.
+                usb_max_current_enable = {
+                  enable = true;
+                  value = 1;
+                };
+              };
+              nvme-installer = {
+                enable = true;
+                targetSystem = self.nixosConfigurations.nvme-target;
+              };
+            })
           ];
         };
       };
@@ -136,36 +135,36 @@
       #   nix build .#raspberrypis.rpi5.nvmeInstallerSdImage
       #   nix build .#raspberrypis.rpi5.sdImage
       raspberrypis.rpi5 = {
-        sdImage = self.nixosConfigurations.rpi-example.config.system.build.sdImage;
-        nvmeInstallerSdImage = self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
+        sdImage =
+          self.nixosConfigurations.rpi-example.config.system.build.sdImage;
+        nvmeInstallerSdImage =
+          self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
       };
 
-      formatter.x86_64-linux = (import srcs.nixpkgs { system = "x86_64-linux"; }).nixfmt-rfc-style;
-      formatter.aarch64-linux = pinned.nixfmt-rfc-style;
+      formatter.x86_64-linux = (srcs.treefmt-nix.lib.evalModule
+        (import srcs.nixpkgs { system = "x86_64-linux"; })
+        ./treefmt.nix).config.build.wrapper;
+      formatter.aarch64-linux = (srcs.treefmt-nix.lib.evalModule pinned
+        ./treefmt.nix).config.build.wrapper;
 
       checks.aarch64-linux = self.packages.aarch64-linux;
-      packages.aarch64-linux =
-        with pinned.lib;
+      packages.aarch64-linux = with pinned.lib;
         let
           kernels = foldlAttrs f { } pinned.rpi-kernels;
-          f =
-            acc: kernel-version: board-attr-set:
-            foldlAttrs (
-              acc: board-version: drv:
-              acc
-              // {
+          f = acc: kernel-version: board-attr-set:
+            foldlAttrs (acc: board-version: drv:
+              acc // {
                 "linux-${kernel-version}-${board-version}" = drv;
-              }
-            ) acc board-attr-set;
-        in
-        {
-          example-sd-image = self.nixosConfigurations.rpi-example.config.system.build.sdImage;
-          nvme-installer-sd-image = self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
+              }) acc board-attr-set;
+        in {
+          example-sd-image =
+            self.nixosConfigurations.rpi-example.config.system.build.sdImage;
+          nvme-installer-sd-image =
+            self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
           firmware = pinned.raspberrypifw;
           libcamera = pinned.libcamera;
           wireless-firmware = pinned.raspberrypiWirelessFirmware;
           uboot-rpi-arm64 = pinned.uboot-rpi-arm64;
-        }
-        // kernels;
+        } // kernels;
     };
 }
