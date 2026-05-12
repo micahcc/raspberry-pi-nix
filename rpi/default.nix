@@ -104,9 +104,8 @@ in {
           firmware-path = "/boot/firmware";
           kernel-params = pkgs.writeTextFile {
             name = "cmdline.txt";
-            text = ''
-              ${lib.strings.concatStringsSep " " config.boot.kernelParams}
-            '';
+            text = lib.strings.concatStringsSep " " config.boot.kernelParams
+              + "\n";
           };
         in {
           Type = "oneshot";

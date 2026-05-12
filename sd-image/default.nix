@@ -24,9 +24,7 @@
     sdImage = let
       kernel-params = pkgs.writeTextFile {
         name = "cmdline.txt";
-        text = ''
-          ${lib.strings.concatStringsSep " " config.boot.kernelParams}
-        '';
+        text = lib.strings.concatStringsSep " " config.boot.kernelParams + "\n";
       };
       cfg = config.raspberry-pi-nix;
       version = cfg.kernel-version;

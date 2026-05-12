@@ -6,7 +6,7 @@ let
       lib.strings.concatStringsSep "\n" (render-dt-kvs opts);
     render-dt-param = x: "dtparam=" + x;
     render-dt-kv = k: v:
-      if isNull v.value then
+      if v.value == null then
         k
       else
         let vstr = toString v.value; in "${k}=${vstr}";

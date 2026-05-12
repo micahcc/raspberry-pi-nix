@@ -11,9 +11,7 @@ let
     "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
   kernel-params = pkgs.writeTextFile {
     name = "cmdline.txt";
-    text = ''
-      ${lib.strings.concatStringsSep " " config.boot.kernelParams}
-    '';
+    text = lib.strings.concatStringsSep " " config.boot.kernelParams + "\n";
   };
 in {
   config = {
