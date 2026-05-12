@@ -15,6 +15,7 @@ let
     nativeBuildInputs = [ pkgs.shellcheck ];
     targetToplevel = toString targetToplevel;
     targetFirmware = toString targetFirmware;
+    firmwarePartitionSize = config.nvme-installer.firmwarePartitionSize;
     sfdisk = "${pkgs.util-linux}/bin/sfdisk";
     partprobe = "${pkgs.parted}/bin/partprobe";
     mkfsVfat = "${pkgs.dosfstools}/bin/mkfs.vfat";
@@ -37,6 +38,16 @@ in {
       description = ''
         The evaluated NixOS system configuration to install onto the NVMe.
         This should be the result of `nixpkgs.lib.nixosSystem { ... }`.
+      '';
+    };
+
+    firmwarePartitionSize = lib.mkOption {
+      type = lib.types.str;
+      default = "512M";
+      description = ''
+        Size of the firmware partition on the NVMe drive.
+        This is larger than the SD card default (128MB) to provide room
+        for firmware updates and multiple kernel versions.
       '';
     };
   };

@@ -1,6 +1,9 @@
 { config, lib, pkgs, ... }:
 
-{
+let
+  fw = import ../lib/firmware.nix { inherit lib pkgs config; };
+  cfg = config.raspberry-pi-nix;
+in {
   imports = [ ./sd-image.nix ];
 
   config = {
@@ -21,31 +24,8 @@
       "rootwait"
     ];
 
-    sdImage = let
-      kernel-params = pkgs.writeTextFile {
-        name = "cmdline.txt";
-        text = lib.strings.concatStringsSep " " config.boot.kernelParams + "\n";
-      };
-      cfg = config.raspberry-pi-nix;
-      version = cfg.kernel-version;
-      board = cfg.board;
-      kernel =
-        "${config.system.build.kernel}/${config.system.boot.loader.kernelFile}";
-      initrd =
-        "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
-      populate-kernel = if cfg.uboot.enable then ''
-        cp ${cfg.uboot.package}/u-boot.bin firmware/u-boot-rpi-arm64.bin
-      '' else ''
-        cp "${kernel}" firmware/kernel.img
-        cp "${initrd}" firmware/initrd
-        cp "${kernel-params}" firmware/cmdline.txt
-      '';
-    in {
-      populateFirmwareCommands = ''
-        ${populate-kernel}
-        cp -r ${pkgs.raspberrypifw}/share/raspberrypi/boot/{start*.elf,*.dtb,bootcode.bin,fixup*.dat,overlays} firmware
-        cp ${config.hardware.raspberry-pi.config-output} firmware/config.txt
-      '';
+    sdImage = {
+      populateFirmwareCommands = fw.populateFirmwareDir "firmware";
       populateRootCommands = if cfg.uboot.enable then ''
         mkdir -p ./files/boot
         ${config.boot.loader.generic-extlinux-compatible.populateCmd} -c ${config.system.build.toplevel} -d ./files/boot

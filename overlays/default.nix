@@ -9,7 +9,7 @@ let
     v6_12_87.src = rpi-linux-6_12_87-src;
     v6_18_28.src = rpi-linux-6_18_28-src;
   };
-  boards = [ "bcm2711" "bcm2712" ];
+  boards = import ../lib/boards.nix;
 
   # Helpers for building the `pkgs.rpi-kernels' map.
   rpi-kernel = { version, board }:

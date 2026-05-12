@@ -3,16 +3,7 @@
 # Users should import this and customize it (add users, services, etc.)
 { pkgs, lib, config, ... }:
 
-let
-  cfg = config.raspberry-pi-nix;
-  kernel =
-    "${config.system.build.kernel}/${config.system.boot.loader.kernelFile}";
-  initrd =
-    "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
-  kernel-params = pkgs.writeTextFile {
-    name = "cmdline.txt";
-    text = lib.strings.concatStringsSep " " config.boot.kernelParams + "\n";
-  };
+let fw = import ../lib/firmware.nix { inherit lib pkgs config; };
 in {
   config = {
     raspberry-pi-nix.board = lib.mkDefault "bcm2712";
@@ -50,18 +41,7 @@ in {
     # so the installer can copy them.
     system.build.nvmeFirmware = pkgs.runCommand "nvme-firmware" { } ''
       mkdir -p $out
-
-      # Kernel and initrd
-      cp "${kernel}" $out/kernel.img
-      cp "${initrd}" $out/initrd
-      cp "${kernel-params}" $out/cmdline.txt
-
-      # RPi firmware files
-      cp -r ${pkgs.raspberrypifw}/share/raspberrypi/boot/{start*.elf,*.dtb,bootcode.bin,fixup*.dat} $out/
-      cp -r ${pkgs.raspberrypifw}/share/raspberrypi/boot/overlays $out/
-
-      # config.txt
-      cp ${config.hardware.raspberry-pi.config-output} $out/config.txt
+      ${fw.populateFirmwareDir "$out"}
     '';
   };
 }

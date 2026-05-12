@@ -5,9 +5,8 @@ let
   cfg = config.raspberry-pi-nix;
   version = cfg.kernel-version;
   board = cfg.board;
-  kernel = config.system.build.kernel;
-  initrd =
-    "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
+  fw = import ../lib/firmware.nix { inherit lib pkgs config; };
+  inherit (fw) kernel initrd kernel-params;
 in {
   imports = [ ./config.nix ./i2c.nix ];
 
@@ -19,7 +18,7 @@ in {
         description = "Kernel version to build.";
       };
       board = mkOption {
-        type = types.enum [ "bcm2711" "bcm2712" ];
+        type = types.enum (import ../lib/boards.nix);
         description = ''
           The kernel board version to build.
           Examples at: https://www.raspberrypi.com/documentation/computers/linux_kernel.html#native-build-configuration
@@ -100,13 +99,7 @@ in {
           [ "multi-user.target" ]
         else
           [ ];
-        serviceConfig = let
-          firmware-path = "/boot/firmware";
-          kernel-params = pkgs.writeTextFile {
-            name = "cmdline.txt";
-            text = lib.strings.concatStringsSep " " config.boot.kernelParams
-              + "\n";
-          };
+        serviceConfig = let firmware-path = "/boot/firmware";
         in {
           Type = "oneshot";
           MountImages =
@@ -118,7 +111,7 @@ in {
             TARGET_FIRMWARE_DIR="${firmware-path}"
             TARGET_OVERLAYS_DIR="$TARGET_FIRMWARE_DIR/overlays"
             TMPFILE="$TARGET_FIRMWARE_DIR/tmp"
-            KERNEL="${kernel}/${config.system.boot.loader.kernelFile}"
+            KERNEL="${kernel}"
             SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
             SRC_FIRMWARE_DIR="${pkgs.raspberrypifw}/share/raspberrypi/boot"
             STARTFILES=("$SRC_FIRMWARE_DIR"/start*.elf)

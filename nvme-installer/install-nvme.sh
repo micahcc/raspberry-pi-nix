@@ -4,6 +4,7 @@ set -euo pipefail
 NVME_DEV="${1:-/dev/nvme0n1}"
 TARGET_TOPLEVEL="@targetToplevel@"
 TARGET_FIRMWARE="@targetFirmware@"
+FIRMWARE_PARTITION_SIZE="@firmwarePartitionSize@"
 SFDISK="@sfdisk@"
 PARTPROBE="@partprobe@"
 MKFS_VFAT="@mkfsVfat@"
@@ -50,7 +51,7 @@ echo ">>> Partitioning $NVME_DEV..."
 "$SFDISK" "$NVME_DEV" <<EOF
 label: dos
 
-size=512M, type=b
+size=${FIRMWARE_PARTITION_SIZE}, type=b
 type=83
 EOF
 
