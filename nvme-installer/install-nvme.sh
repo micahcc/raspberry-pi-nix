@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+AUTO_CONFIRM=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --yes|-y) AUTO_CONFIRM=true; shift ;;
+    *) break ;;
+  esac
+done
+
 NVME_DEV="${1:-/dev/nvme0n1}"
 TARGET_TOPLEVEL="@targetToplevel@"
 TARGET_FIRMWARE="@targetFirmware@"
@@ -34,10 +42,12 @@ echo "NixOS closure: $TARGET_TOPLEVEL"
 echo ""
 echo "WARNING: This will ERASE ALL DATA on $NVME_DEV"
 echo ""
-read -rp "Continue? [y/N] " confirm
-if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-  echo "Aborted."
-  exit 0
+if [ "$AUTO_CONFIRM" = "false" ]; then
+  read -rp "Continue? [y/N] " confirm
+  if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+    echo "Aborted."
+    exit 0
+  fi
 fi
 
 echo ""
