@@ -50,15 +50,6 @@ in {
         for firmware updates and multiple kernel versions.
       '';
     };
-
-    autoInstall = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = ''
-        Automatically run the NVMe install on first boot without user confirmation.
-        The system will reboot after a successful install.
-      '';
-    };
   };
 
   config = lib.mkIf config.nvme-installer.enable {
@@ -113,18 +104,5 @@ in {
 
     # Ensure NVMe is available in the installer
     boot.initrd.availableKernelModules = [ "nvme" ];
-
-    systemd.services.nvme-autoinstall = lib.mkIf config.nvme-installer.autoInstall {
-      description = "Automatically install NixOS to NVMe";
-      wantedBy = [ "multi-user.target" ];
-      after = [ "network.target" ];
-      serviceConfig = {
-        Type = "oneshot";
-        ExecStart = "${install-script}/bin/install-nvme --yes";
-        ExecStartPost = "${pkgs.systemd}/bin/systemctl reboot";
-        StandardOutput = "journal+console";
-        StandardError = "journal+console";
-      };
-    };
   };
 }
