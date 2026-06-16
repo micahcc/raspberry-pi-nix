@@ -30,10 +30,10 @@ in {
         device = "/dev/disk/by-label/NIXOS_NVME";
         fsType = "ext4";
       };
-      "/boot/firmware" = {
+      "/boot" = {
         device = "/dev/disk/by-label/FIRMWARE";
         fsType = "vfat";
-        options = [ "noatime" "noauto" "x-systemd.automount" ];
+        options = [ "noatime" ];
       };
     };
 
