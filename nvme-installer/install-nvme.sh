@@ -83,10 +83,12 @@ echo ">>> Formatting root partition ($ROOT_PART) as ext4..."
 echo ">>> Mounting partitions..."
 MOUNT_ROOT=$(mktemp -d)
 mount "$ROOT_PART" "$MOUNT_ROOT"
+mkdir -p "$MOUNT_ROOT/boot/firmware"
+mount "$FIRMWARE_PART" "$MOUNT_ROOT/boot/firmware"
 
 cleanup() {
   echo ">>> Cleaning up mounts..."
-  umount "$MOUNT_ROOT/boot" 2>/dev/null || true
+  umount "$MOUNT_ROOT/boot/firmware" 2>/dev/null || true
   umount "$MOUNT_ROOT" 2>/dev/null || true
   rmdir "$MOUNT_ROOT" 2>/dev/null || true
 }
@@ -113,12 +115,11 @@ mkdir -p "$MOUNT_ROOT/etc"
 touch "$MOUNT_ROOT/etc/NIXOS"
 
 echo ">>> Populating firmware partition..."
-mkdir -p "$MOUNT_ROOT/boot"
-mount "$FIRMWARE_PART" "$MOUNT_ROOT/boot"
-cp -r "$TARGET_FIRMWARE"/. "$MOUNT_ROOT/boot/"
+cp -r "$TARGET_FIRMWARE"/. "$MOUNT_ROOT/boot/firmware/"
 
 if [ -n "$USE_UBOOT" ]; then
   echo ">>> Setting up extlinux boot configuration (u-boot)..."
+  mkdir -p "$MOUNT_ROOT/boot"
   $EXTLINUX_POPULATE_CMD -c "$TARGET_TOPLEVEL" -d "$MOUNT_ROOT/boot"
 fi
 
