@@ -10,6 +10,11 @@ let
   targetFirmware =
     config.nvme-installer.targetSystem.config.system.build.nvmeFirmware;
 
+  targetUbootEnabled =
+    config.nvme-installer.targetSystem.config.raspberry-pi-nix.uboot.enable;
+  targetExtlinuxPopulateCmd =
+    config.nvme-installer.targetSystem.config.boot.loader.generic-extlinux-compatible.populateCmd;
+
   install-script = pkgs.runCommand "install-nvme" {
     src = ./install-nvme.sh;
     nativeBuildInputs = [ pkgs.shellcheck ];
@@ -23,6 +28,8 @@ let
     nix = "${pkgs.nix}/bin/nix";
     nixEnv = "${pkgs.nix}/bin/nix-env";
     rpiEepromConfig = "${pkgs.raspberrypi-eeprom}/bin/rpi-eeprom-config";
+    useUboot = if targetUbootEnabled then "1" else "";
+    extlinuxPopulateCmd = toString targetExtlinuxPopulateCmd;
   } ''
     shellcheck "$src"
     mkdir -p $out/bin
