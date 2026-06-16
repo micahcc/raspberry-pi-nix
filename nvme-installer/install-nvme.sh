@@ -20,8 +20,6 @@ MKFS_EXT4="@mkfsExt4@"
 NIX="@nix@"
 NIX_ENV="@nixEnv@"
 RPI_EEPROM_CONFIG="@rpiEepromConfig@"
-USE_UBOOT="@useUboot@"
-EXTLINUX_POPULATE_CMD="@extlinuxPopulateCmd@"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Error: must run as root"
@@ -116,12 +114,6 @@ touch "$MOUNT_ROOT/etc/NIXOS"
 
 echo ">>> Populating firmware partition..."
 cp -r "$TARGET_FIRMWARE"/. "$MOUNT_ROOT/boot/firmware/"
-
-if [ -n "$USE_UBOOT" ]; then
-  echo ">>> Setting up extlinux boot configuration (u-boot)..."
-  mkdir -p "$MOUNT_ROOT/boot"
-  $EXTLINUX_POPULATE_CMD -c "$TARGET_TOPLEVEL" -d "$MOUNT_ROOT/boot"
-fi
 
 echo ">>> Syncing..."
 sync
