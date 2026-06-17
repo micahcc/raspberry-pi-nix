@@ -73,6 +73,7 @@
         nvme-installer = import ./nvme-installer;
         nvme-target = import ./nvme-installer/target.nix;
         emmc-target = import ./emmc-installer/target.nix;
+        kexec-boot-menu = import ./kexec-boot-menu;
       };
       nixosConfigurations = {
         rpi-example = srcs.nixpkgs.lib.nixosSystem {
