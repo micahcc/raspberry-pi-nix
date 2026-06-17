@@ -1,41 +1,54 @@
 #!/bin/sh
 # NixOS kexec boot menu
 # Runs in initrd preLVMCommands (devices available, root not yet mounted)
+# Outputs to both HDMI (via /dev/tty0 + fbcon) and serial (/dev/ttyAMA0).
 
 MOUNT_POINT="/boot-menu-root"
 TIMEOUT=@timeout@
+SERIAL_DEV="/dev/ttyAMA0"
 
-echo ""
-echo "  ============================="
-echo "   NixOS Boot Menu"
-echo "  ============================="
-echo ""
+# Output to both HDMI (tty0/fbcon) and serial
+out() { echo "$@" > /dev/tty0 2>/dev/null; echo "$@" > $SERIAL_DEV 2>/dev/null; }
+outn() { echo -n "$@" > /dev/tty0 2>/dev/null; echo -n "$@" > $SERIAL_DEV 2>/dev/null; }
+
+# Skip menu if we already kexec'd into a selected generation
+for o in $(cat /proc/cmdline); do
+    case "$o" in
+        bootmenu.skip=1) return 0 2>/dev/null || true ;;
+    esac
+done
 
 # Wait for NVMe device to appear
-echo -n "  Waiting for NVMe..."
+outn "  Waiting for NVMe..."
 attempts=0
 while [ ! -b /dev/nvme0n1p2 ] && [ $attempts -lt 50 ]; do
     sleep 0.1
     attempts=$((attempts + 1))
 done
-if [ -b /dev/nvme0n1p2 ]; then
-    echo " found."
-else
-    echo " not found after 5s, continuing default boot..."
+if [ ! -b /dev/nvme0n1p2 ]; then
+    out " not found after 5s, continuing default boot..."
     return 0 2>/dev/null || true
 fi
+out " found."
+
+# Print banner
+out ""
+out "  ============================="
+out "   NixOS Boot Menu"
+out "  ============================="
+out ""
 
 # Mount NVMe root read-only
 mkdir -p "$MOUNT_POINT"
 if ! mount -o ro /dev/nvme0n1p2 "$MOUNT_POINT" 2>/dev/null; then
-    echo "  Could not mount /dev/nvme0n1p2, continuing default boot..."
+    out "  Could not mount /dev/nvme0n1p2, continuing default boot..."
     return 0 2>/dev/null || true
 fi
 
 PROFILES_DIR="$MOUNT_POINT/nix/var/nix/profiles"
 
 if [ ! -d "$PROFILES_DIR" ]; then
-    echo "  Profiles directory not found, continuing default boot..."
+    out "  Profiles directory not found, continuing default boot..."
     umount "$MOUNT_POINT" 2>/dev/null || true
     return 0 2>/dev/null || true
 fi
@@ -77,32 +90,41 @@ for gen_num in $found_links; do
         fi
 
         if [ $count -eq 1 ]; then
-            echo "  [1] Generation $gen_num$version  <- default"
+            out "  [1] Generation $gen_num$version  <- default"
         else
-            echo "  [$count] Generation $gen_num$version"
+            out "  [$count] Generation $gen_num$version"
         fi
     fi
 done
 
 if [ $count -eq 0 ]; then
-    echo "  No bootable generations found, continuing default boot..."
+    out "  No bootable generations found, continuing default boot..."
     umount "$MOUNT_POINT" 2>/dev/null || true
     return 0 2>/dev/null || true
 fi
 
 if [ $count -eq 1 ]; then
-    echo ""
-    echo "  Booting generation (only 1 available)..."
+    out ""
+    out "  Booting generation (only 1 available)..."
     umount "$MOUNT_POINT" 2>/dev/null || true
     return 0 2>/dev/null || true
 fi
 
-echo ""
-echo -n "  Select [1-$count] (default 1, timeout ${TIMEOUT}s): "
+out ""
+outn "  Select [1-$count] (default 1, timeout ${TIMEOUT}s): "
 
-# Read with timeout
+# Read with timeout from both serial and keyboard (console/tty)
 selection=""
+rm -f /tmp/.bootmenu-sel
+(read -t "$TIMEOUT" s < $SERIAL_DEV 2>/dev/null && echo "$s" > /tmp/.bootmenu-sel) &
+spid=$!
 read -t "$TIMEOUT" selection 2>/dev/null || true
+kill $spid 2>/dev/null || true
+wait $spid 2>/dev/null || true
+if [ -z "$selection" ] && [ -f /tmp/.bootmenu-sel ]; then
+    selection=$(cat /tmp/.bootmenu-sel)
+fi
+rm -f /tmp/.bootmenu-sel
 
 # Validate selection
 case "$selection" in
@@ -116,10 +138,10 @@ case "$selection" in
         ;;
 esac
 
-echo ""
+out ""
 
 if [ "$selection" -eq 1 ]; then
-    echo "  Booting default generation..."
+    out "  Booting default generation..."
     umount "$MOUNT_POINT" 2>/dev/null || true
     return 0 2>/dev/null || true
 fi
@@ -144,7 +166,7 @@ for n in $gen_nums; do
     fi
 done
 
-echo "  Booting generation $gen_num..."
+out "  Booting generation $gen_num..."
 
 # Resolve kernel/initrd symlinks — they point to absolute /nix/store paths
 # that need the mount point prefix to be accessible
@@ -179,15 +201,18 @@ init_path="$real_gen_path/init"
 if [ -L "$gen_path/init" ]; then
     init_path=$(readlink "$gen_path/init")
 fi
-params="$params init=$init_path"
+params="$params init=$init_path bootmenu.skip=1"
 
-echo "  Loading kernel..."
+out "  Loading kernel..."
+# Ensure serial console works after kexec (use real device name, not serial0 alias)
+# Also add console=tty1 so fbcon renders to HDMI after kexec
+params="$params console=ttyAMA0,115200n8 console=tty1"
 kexec --load "$kernel" --initrd="$initrd" --command-line="$params"
 
 umount "$MOUNT_POINT" 2>/dev/null || true
 
-echo "  Executing kexec..."
+out "  Executing kexec..."
 kexec --exec
 
 # Should not reach here
-echo "  kexec failed! Continuing default boot..."
+out "  kexec failed! Continuing default boot..."
