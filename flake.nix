@@ -73,6 +73,7 @@
         nvme-installer = import ./nvme-installer;
         nvme-target = import ./nvme-installer/target.nix;
         emmc-target = import ./emmc-installer/target.nix;
+        kexec-boot-menu = import ./kexec-boot-menu;
       };
       nixosConfigurations = {
         rpi-example = srcs.nixpkgs.lib.nixosSystem {
@@ -84,17 +85,18 @@
           ];
         };
 
-        # The NVMe target system (what gets installed on the NVMe)
+        # NVMe target system (what gets installed on the NVMe)
         nvme-target = srcs.nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
           modules = [
             self.nixosModules.raspberry-pi
             self.nixosModules.nvme-target
+            self.nixosModules.kexec-boot-menu
             ./nvme-installer/example.nix
           ];
         };
 
-        # The SD card installer image (boots from SD, installs to NVMe)
+        # NVMe installer (boots from SD/USB, installs target to NVMe)
         nvme-installer = srcs.nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
           modules = [
@@ -133,7 +135,7 @@
           ];
         };
 
-        # The eMMC target system (what gets flashed onto the eMMC)
+        # eMMC target system (what gets flashed onto the eMMC)
         emmc-target = srcs.nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
           modules = [
@@ -142,18 +144,29 @@
             ./emmc-installer/example.nix
           ];
         };
-
       };
-      # Example: building nvmeInstallerSdImage independently from sdImage.
-      #   nix build .#raspberrypis.rpi5.nvmeInstallerSdImage
-      #   nix build .#raspberrypis.rpi5.sdImage
+
+      # Convenience build targets:
+      #   nix build .#raspberrypis.rpi5.toplevel          — NVMe target closure
+      #   nix build .#raspberrypis.rpi5.installer.sdImage — NVMe installer image
+      #   nix build .#raspberrypis.rpi5.sdImage           — SD card image
+      #   nix build .#raspberrypis.cm4.toplevel           — eMMC target closure
+      #   nix build .#raspberrypis.cm4.emmcImage          — eMMC flash image
       raspberrypis.rpi5 = {
+        toplevel =
+          self.nixosConfigurations.nvme-target.config.system.build.toplevel;
         sdImage =
           self.nixosConfigurations.rpi-example.config.system.build.sdImage;
-        nvmeInstallerSdImage =
-          self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
+        installer = {
+          toplevel =
+            self.nixosConfigurations.nvme-installer.config.system.build.toplevel;
+          sdImage =
+            self.nixosConfigurations.nvme-installer.config.system.build.sdImage;
+        };
       };
       raspberrypis.cm4 = {
+        toplevel =
+          self.nixosConfigurations.emmc-target.config.system.build.toplevel;
         emmcImage =
           self.nixosConfigurations.emmc-target.config.system.build.emmcImage;
       };

@@ -147,6 +147,9 @@ in {
               echo "${
                 builtins.toString kernel
               }" > "$STATE_DIRECTORY/kernel-version"
+              echo "${
+                builtins.toString initrd
+              }" > "$STATE_DIRECTORY/initrd-version"
               rm "$STATE_DIRECTORY/kernel-migration-in-progress"
             }
 
@@ -204,6 +207,8 @@ in {
 
             if [[ "$SHOULD_UBOOT" -ne 1 ]] && [[ -f "$STATE_DIRECTORY/kernel-migration-in-progress" || ! -f "$STATE_DIRECTORY/kernel-version" || $(< "$STATE_DIRECTORY/kernel-version") != ${
               builtins.toString kernel
+            } || ! -f "$STATE_DIRECTORY/initrd-version" || $(< "$STATE_DIRECTORY/initrd-version") != ${
+              builtins.toString initrd
             } ]]; then
               migrate_kernel
             fi
@@ -229,6 +234,38 @@ in {
         };
       };
     };
+
+    # Custom boot loader installer for Raspberry Pi (non-u-boot mode).
+    # Called by switch-to-configuration boot/switch. Copies kernel+initrd
+    # to the firmware partition so the Pi firmware loads the correct files.
+    system.build.installBootLoader = lib.mkIf (!cfg.uboot.enable) (
+      pkgs.writeScript "install-rpi-boot" ''
+        #!${pkgs.bash}/bin/bash
+        set -eu
+
+        defaultConfig="$1"
+        FIRMWARE_DIR="/boot/firmware"
+
+        # Ensure firmware partition is mounted
+        if ! mountpoint -q "$FIRMWARE_DIR" 2>/dev/null; then
+          mount "$FIRMWARE_DIR" 2>/dev/null || true
+        fi
+
+        if [ ! -d "$FIRMWARE_DIR" ]; then
+          echo "WARNING: firmware partition not available at $FIRMWARE_DIR"
+          exit 0
+        fi
+
+        cp "${kernel}" "$FIRMWARE_DIR/kernel.img.tmp"
+        cp "${initrd}" "$FIRMWARE_DIR/initrd.tmp"
+        cp "${kernel-params}" "$FIRMWARE_DIR/cmdline.txt.tmp"
+        mv "$FIRMWARE_DIR/kernel.img.tmp" "$FIRMWARE_DIR/kernel.img"
+        mv "$FIRMWARE_DIR/initrd.tmp" "$FIRMWARE_DIR/initrd"
+        mv "$FIRMWARE_DIR/cmdline.txt.tmp" "$FIRMWARE_DIR/cmdline.txt"
+
+        echo "Firmware partition updated with kernel+initrd."
+      ''
+    );
 
     # Default config.txt on Raspberry Pi OS:
     # https://github.com/RPi-Distro/pi-gen/blob/master/stage1/00-boot-files/files/config.txt
@@ -353,7 +390,7 @@ in {
         pkgs.linuxPackagesFor pkgs.rpi-kernels."${version}"."${board}";
       loader = {
         grub.enable = lib.mkDefault false;
-        initScript.enable = !cfg.uboot.enable;
+        initScript.enable = lib.mkDefault false;
         generic-extlinux-compatible = {
           enable = lib.mkDefault cfg.uboot.enable;
           # We want to use the device tree provided by firmware, so don't
